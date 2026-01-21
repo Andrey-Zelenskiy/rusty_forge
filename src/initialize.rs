@@ -1,22 +1,23 @@
 // Copyright Andrey Zelenskiy, 2024
 use crate::config_parse::{Config, FromConfig};
+use serde::Serialize;
 
 /* ------------------------------------ */
 /* Methods for structure initialization */
 /* ------------------------------------ */
 
 // Trait for argument structure with required initialization function
-pub trait BuilderMethods: Default + FromConfig {
+pub trait BuilderMethods: Default + Serialize + FromConfig {
     type Target;
 
     // Initialize target structure from the parameters
     fn build(&mut self) -> Self::Target;
+
+    // Create a builder from the existing target
+    fn from_target(target: &Self::Target) -> Self;
 }
 
 // Trait for initializing a structure from an argument structure
-// pub trait TargetFromBuilder<T>
-// where
-// T: BuilderMethods<Target = Self>,
 pub trait TargetFromBuilder {
     type Builder: BuilderMethods<Target = Self>;
     // Initialize new Target from input parameters
@@ -45,43 +46,46 @@ mod tests {
         y2: u32,
     }
 
-    mod test_builder {
-        use super::*;
+    #[derive(Deserialize, Default, Serialize)]
+    pub struct Builder {
+        x: u32,
+        y: u32,
+    }
 
-        #[derive(Deserialize, Default)]
-        pub struct Builder {
-            x: u32,
-            y: u32,
+    // Add methods for setting values
+    impl Builder {
+        pub fn set_x(&mut self, x: u32) -> &mut Self {
+            self.x = x;
+            self
         }
 
-        // Add methods for setting values
-        impl Builder {
-            pub fn set_x(&mut self, x: u32) -> &mut Self {
-                self.x = x;
-                self
-            }
-
-            pub fn set_y(&mut self, y: u32) -> &mut Self {
-                self.y = y;
-                self
-            }
+        pub fn set_y(&mut self, y: u32) -> &mut Self {
+            self.y = y;
+            self
         }
+    }
 
-        impl BuilderMethods for Builder {
-            type Target = TargetStruct;
+    impl BuilderMethods for Builder {
+        type Target = TargetStruct;
 
-            fn build(&mut self) -> Self::Target {
-                Self::Target {
-                    x2: self.x * self.x,
-                    xy: self.x * self.y,
-                    y2: self.y * self.y,
-                }
+        fn build(&mut self) -> Self::Target {
+            Self::Target {
+                x2: self.x * self.x,
+                xy: self.x * self.y,
+                y2: self.y * self.y,
             }
         }
 
-        impl TargetFromBuilder for TargetStruct {
-            type Builder = Builder;
+        fn from_target(target: &TargetStruct) -> Self {
+            Self {
+                x: target.x2.isqrt(),
+                y: target.y2.isqrt(),
+            }
         }
+    }
+
+    impl TargetFromBuilder for TargetStruct {
+        type Builder = Builder;
     }
 
     #[test]
@@ -91,5 +95,18 @@ mod tests {
         assert_eq!(1, target.x2);
         assert_eq!(2, target.xy);
         assert_eq!(4, target.y2);
+    }
+
+    #[test]
+    fn builder_from_target() {
+        let target = TargetStruct {
+            x2: 1,
+            xy: 2,
+            y2: 4,
+        };
+        let builder = Builder::from_target(&target);
+
+        assert_eq!(builder.x, 1);
+        assert_eq!(builder.y, 2);
     }
 }

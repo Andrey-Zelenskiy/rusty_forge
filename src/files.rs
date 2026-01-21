@@ -466,8 +466,8 @@ impl FileManager {
             .open(path)
         {
             // Write the header
-            Ok(mut file) => match header {
-                Some(header_str) => {
+            Ok(mut file) => {
+                if let Some(header_str) = header {
                     if let Err(reason) = writeln!(file, "{header_str}") {
                         panic!(
                             "Could not write to file {:?}: {:?}",
@@ -475,8 +475,7 @@ impl FileManager {
                         );
                     }
                 }
-                None => (),
-            },
+            }
             Err(reason) => {
                 panic!("Could not open file {:?}: {:?}", path, reason)
             }
