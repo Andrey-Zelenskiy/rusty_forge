@@ -1,13 +1,15 @@
+use config::Config;
 // Copyright Andrey Zelenskiy, 2024-2026
-use crate::config_parse::{Config, FromConfig};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /* ------------------------------------ */
 /* Methods for structure initialization */
 /* ------------------------------------ */
 
 // Trait for argument structure with required initialization function
-pub trait BuilderMethods: Default + Serialize + FromConfig {
+pub trait BuilderMethods:
+    Default + for<'de> Deserialize<'de> + Serialize
+{
     type Target;
 
     // Initialize target structure from the parameters
@@ -31,7 +33,10 @@ pub trait TargetFromBuilder {
         Self: Sized,
     {
         //Populate the parameters from the config
-        Self::Builder::from_config(config, config_name).build()
+        match config.get::<Self::Builder>(config_name) {
+            Ok(mut builder) => builder.build(),
+            Err(reason) => panic!("Missing config for {config_name}: {reason}"),
+        }
     }
 }
 
