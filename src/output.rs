@@ -1,4 +1,4 @@
-// Copyright Andrey Zelenskiy, 2024-2025
+// Copyright Andrey Zelenskiy, 2024-2026
 use std::{fmt, io::Write};
 
 use serde::Serialize;

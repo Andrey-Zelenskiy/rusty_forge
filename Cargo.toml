@@ -1,7 +1,13 @@
 [package]
-name = "io_utils"
+name = "rusty_forge"
 version = "0.1.0"
 edition = "2021"
+description = "General-purpose library of utility methods for numerical simulations."
+license = "BSD-3"
+repository = ""
+readme = "README.md"
+keywords = ["numerical simulations", "utilities"]
+categorier = ["filesystem", "science", "development-tools::build-utils"]
 
 [dependencies]
 toml = "0.8"

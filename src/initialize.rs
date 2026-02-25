@@ -1,4 +1,4 @@
-// Copyright Andrey Zelenskiy, 2024
+// Copyright Andrey Zelenskiy, 2024-2026
 use crate::config_parse::{Config, FromConfig};
 use serde::Serialize;
 
