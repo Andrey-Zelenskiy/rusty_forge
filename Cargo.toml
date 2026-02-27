@@ -10,7 +10,10 @@ keywords = ["numerical simulations", "utilities"]
 categorier = ["filesystem", "science", "development-tools::build-utils"]
 
 [dependencies]
-toml = "0.8"
-serde_json = "1.0"
-serde = { version = "1.0", features = [ "derive" ] }
+chrono = { version = "0.4", features = [ "serde" ] }
 config = "0.15"
+rayon = "1.11"
+regex = "1.12"
+serde = { version = "1.0", features = [ "derive" ] }
+sysinfo = "0.38"
+toml = "0.8"

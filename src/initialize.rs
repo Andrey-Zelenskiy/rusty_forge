@@ -1,5 +1,6 @@
-use config::Config;
 // Copyright Andrey Zelenskiy, 2024-2026
+
+use config::Config;
 use serde::{Deserialize, Serialize};
 
 /* ------------------------------------ */
