@@ -1,127 +1,273 @@
 // Copyright Andrey Zelenskiy, 2024-2026
 
-//! # Module for setting up simulation project
+//! # Module for interfacing with data files
 //!
-//! This module provides methods for setting up the files and directory tree
-//! of a numerical simulation project.
-//! The methods emphasize data safety, providing several protocols for dealing
-//! with existing data.
+//! This module provides methods for setting up the output files.
 //!
 //! ## Example
 //!
-//! ```rust
-//! use rusty_forge::ProjectManager;
-//! ```
 
-use std::{
-    fs::read_dir,
-    io::{Error, ErrorKind},
-    path::PathBuf,
-};
+use std::path::PathBuf;
 
-use regex::Regex;
+use serde::{Deserialize, Serialize};
 
-use serde::Deserialize;
+use crate::initialize::{BuilderMethods, TargetFromBuilder};
 
-/// Project directory initializer
-#[derive(Deserialize, Debug)]
-pub struct ProjectManager {
-    /// Path to the project directory
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct FileManager {
+    // Project root directory
+    project_dir: String,
+    // Data subdirectory
+    output_dir: Option<String>,
+    // File name
+    name: String,
+    // File extension
+    extension: String,
+    // Option for file series
+    series: Option<(u32, usize)>,
+    /// Path to the data output
     path: PathBuf,
-    /// Type of behaviour if project files already exist
-    data_protocol: DataProtocol,
+    /// Permission for writing to the file
+    writable: bool,
 }
 
-/// Protocol for dealing with files that already exist
-#[derive(Deserialize, Debug)]
-pub enum DataProtocol {
-    /// Unschedules writing of the files that already exist in the directory
-    Ignore,
-    /// Interrupts the program if data with duplicate names already exist
-    Panic,
-    /// In recovery mode, appends data to existing files
-    /// Note: if recovery is set to False, the protocol will be automatically
-    /// switched to Ignore
-    Recovery,
-    /// Copies duplicate data to a timestamped folder
-    Timestamped,
+/// Builder of FileManager
+///
+/// Note that project_dir, name, and extension must be specified to
+/// successfully build the structure.
+///
+/// ## Example
+///
+/// ```
+/// use rusty_forge::{FileManager, BuilderMethods, TargetFromBuilder};
+///
+/// let file_manager = FileManager::builder()
+///   .set_project_dir("./project")
+///   .set_output_dir("data")
+///   .set_name("averages")
+///   .set_extension("txt")
+///   .build()
+///   .expect("Failed to initialize a file manager");
+/// ```
+#[derive(Default, Deserialize, Serialize)]
+pub struct FileManagerBuilder {
+    // Project root directory
+    project_dir: Option<String>,
+    // Data subdirectory
+    output_dir: Option<String>,
+    // File name
+    name: Option<String>,
+    // File extension
+    extension: Option<String>,
+    // Option for file series
+    series: Option<u32>,
 }
 
-impl ProjectManager {
-    /// Initializes simulation directory
-    ///
-    ///
-    pub fn initialize_project(&mut self) -> Result<(), Error> {
-        // Check if the directory already exists, in which case execute data
-        // protocol
-        if self.exists() {
-            // Check if the program is allowed to proceed
-            if self.data_protocol = DataProtocol::Panic {
-                Err(Error::new(
-                    ErrorKind::AlreadyExists,
-                    "Project directory already exists.",
+impl FileManagerBuilder {
+    // Setter methods
+
+    /// Sets project root directory
+    pub fn set_project_dir<V: ToString>(
+        &mut self,
+        project_dir: V,
+    ) -> &mut Self {
+        self.project_dir = Some(project_dir.to_string());
+        self
+    }
+
+    /// Sets subdirectory of the data
+    pub fn set_output_dir<V: ToString>(&mut self, output_dir: V) -> &mut Self {
+        self.output_dir = Some(output_dir.to_string());
+        self
+    }
+
+    /// Sets file name
+    pub fn set_name<V: ToString>(&mut self, name: V) -> &mut Self {
+        self.name = Some(name.to_string());
+        self
+    }
+
+    /// Sets file extension
+    pub fn set_extension<V: ToString>(&mut self, extension: V) -> &mut Self {
+        self.extension = Some(extension.to_string());
+        self
+    }
+
+    /// Specifies manager for a series of n_files outputs
+    pub fn set_series(&mut self, n_files: u32) -> &mut Self {
+        self.series = Some(n_files);
+        self
+    }
+}
+
+impl BuilderMethods for FileManagerBuilder {
+    type Target = FileManager;
+
+    fn try_build(&mut self) -> Result<Self::Target, String> {
+        // Ensure that the required components are specified
+        match (&self.project_dir, &self.name, &self.extension) {
+            (Some(project_dir), Some(name), Some(extension)) => {
+                // Construct the path to output
+                let mut path = PathBuf::new();
+
+                // Project root
+                path.push(project_dir);
+
+                // Output subdirectory
+                let output_dir = match &self.output_dir {
+                    Some(output_path) => output_path.to_string(),
+                    None => "".to_string(),
+                };
+
+                path.push(output_dir);
+
+                // File name
+                // If working with a series of file, initialize the first file
+                let filename = match &self.series {
+                    Some(_) => format!("{name}_0"),
+                    None => name.to_string(),
+                };
+
+                path.push(filename);
+
+                // File extension
+                path.set_extension(extension);
+
+                Ok(Self::Target {
+                    project_dir: project_dir.to_string(),
+                    output_dir: self.output_dir.clone(),
+                    name: name.to_string(),
+                    extension: extension.to_string(),
+                    series: self.series.map(|n| (n, 0)),
+                    path,
+                    writable: true,
+                })
+            }
+            _ => {
+                let values_opt =
+                    [&self.project_dir, &self.name, &self.extension];
+                let values = values_opt.map(|v| match v {
+                    Some(s) => s.to_string(),
+                    None => String::from("NOT_SPECIFIED"),
+                });
+
+                Err(format!(
+                    "FileManager requires project_dir ({}), name ({}), \
+                        and extension ({}).",
+                    values[0], values[1], values[2]
                 ))
-            } else if let Ok(entries) = read_dir(self.path) {
-                // Check if the existing directory is empty
-                if entries.next().is_none() {
-                    Ok(())
-                }
-                // Check for timestamp protocols
-                else if self.data_protocol = DataProtocol::Timestamped {
-                    self.is_timestamped()
-                    // let mut manifest_path = PathBuf::from(self.path);
-                    // manifest_path.push("manifest.toml")
-                    // self.path
-                }
-            }
-
-            // Check the manifest file for date, complition status
-            // If no manifest, check that the directory is empty
-            // If empty, Ok(()), otherwise ErrorKind::DirectoryNotEmpty
-
-            // Timestamped: check if timestamps exist. If yes, create a new one
-            // and return Ok(()). Otherwise, first copy the old data into a
-            // timestamped directory.
-
-            // Recovery: if manifest status is Completed, return
-            // ErrorKind::Other, "Simulation "
-        }
-
-        // Check if recovery
-    }
-
-    // Checks if the project directory already exists
-    fn exists(&self) -> bool {
-        self.path.is_dir()
-    }
-
-    // Checks if the project directory is timestamped
-    fn is_timestamped(&self) -> bool {
-        let mut timestamped = false;
-
-        if self.exists() {
-            // Regex for the timestamps
-            let re = Regex::new(r"^\d{4}-\d{2}-\d{2}$").unwrap();
-
-            // Get items of the directory
-            if let Ok(entries) = read_dir(&self.path) {
-                for entry in entries.flatten() {
-                    if let Ok(file_type) = entry.file_type() {
-                        // Only care about directories
-                        if file_type.is_dir() {
-                            if let Some(name) = entry.file_name().to_str() {
-                                // Check if directory name matches timestamp
-                                // format yyyy-mm-dd
-                                if re.is_match(name) {
-                                    timestamped = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
-        timestamped
+    }
+
+    fn from_target(target: &Self::Target) -> Self {
+        Self {
+            project_dir: Some(target.project_dir.to_string()),
+            output_dir: target.output_dir.clone(),
+            name: Some(target.name.to_string()),
+            extension: Some(target.extension.to_string()),
+            series: target.series.map(|(n, _)| n),
+        }
+    }
+}
+
+impl TargetFromBuilder for FileManager {
+    type Builder = FileManagerBuilder;
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use tempfile::tempdir;
+
+    use super::*;
+
+    #[test]
+    fn build_file_manager() {
+        let file_manager = FileManager::builder()
+            .set_project_dir("./project")
+            .set_output_dir("data")
+            .set_name("averages")
+            .set_extension("txt")
+            .build()
+            .unwrap();
+
+        assert!(file_manager.writable);
+
+        assert_eq!(
+            PathBuf::from_str("./project/data/averages.txt").unwrap(),
+            file_manager.path
+        );
+    }
+
+    #[test]
+    fn build_file_manager_no_output_dir() {
+        let file_manager = FileManager::builder()
+            .set_project_dir("./project")
+            .set_name("averages")
+            .set_extension("txt")
+            .build()
+            .unwrap();
+
+        assert!(file_manager.writable);
+
+        assert_eq!(
+            PathBuf::from_str("./project/averages.txt").unwrap(),
+            file_manager.path
+        );
+    }
+
+    #[test]
+    fn build_file_manager_series() {
+        let file_manager = FileManager::builder()
+            .set_project_dir("./project")
+            .set_output_dir("data")
+            .set_name("averages")
+            .set_extension("txt")
+            .set_series(5)
+            .build()
+            .unwrap();
+
+        assert!(file_manager.writable);
+
+        assert_eq!(
+            PathBuf::from_str("./project/data/averages_0.txt").unwrap(),
+            file_manager.path
+        );
+    }
+
+    // Tests for incomplete data
+    #[test]
+    #[should_panic]
+    fn build_file_manager_no_project_dir() {
+        let _ = FileManager::builder()
+            .set_output_dir("data")
+            .set_name("averages")
+            .set_extension("txt")
+            .build()
+            .unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn build_file_manager_no_name() {
+        let _ = FileManager::builder()
+            .set_project_dir("./project")
+            .set_output_dir("data")
+            .set_extension("txt")
+            .build()
+            .unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn build_file_manager_no_extension() {
+        let _ = FileManager::builder()
+            .set_project_dir("./project")
+            .set_output_dir("data")
+            .set_name("averages")
+            .build()
+            .unwrap();
     }
 }
