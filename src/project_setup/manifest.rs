@@ -9,7 +9,7 @@
 //! ## Example
 //!
 //! ```rust
-//! use rusty_forge::ProjectManager;
+//! use rusty_forge::project_setup::ProjectManager;
 //! ```
 
 use std::{fs::write, io::Error, path::PathBuf};

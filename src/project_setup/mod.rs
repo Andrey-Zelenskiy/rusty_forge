@@ -10,13 +10,13 @@
 //! ## Example
 //!
 //! ```rust
-//! use rusty_forge::ProjectManager;
+//! use rusty_forge::project_setup::ProjectManager;
 //! ```
 
 use std::{
     fs,
     io::{Error, ErrorKind},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use config::Config;
@@ -63,6 +63,27 @@ pub enum DataProtocol {
 }
 
 impl ProjectManager {
+    /// Simple project structure: new directory without timestamps or series,
+    /// panics if already exists
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use rusty_forge::project_setup::ProjectManager;
+    ///
+    /// let project_manager = ProjectManager::new_simple("/tmp/simulation_project");
+    ///
+    /// assert!(!project_manager.is_recovery());
+    /// ```
+    pub fn new_simple<P: AsRef<Path>>(path: P) -> Self {
+        Self {
+            path: PathBuf::from(path.as_ref()),
+            recovery_mode: false,
+            directory_structure: DirectoryStructure::Simple,
+            data_protocol: DataProtocol::Panic,
+        }
+    }
+
     /// Initializes simulation directory
     ///
     ///
@@ -85,6 +106,12 @@ impl ProjectManager {
 
         // Recovery: if manifest status is Completed, return
         // ErrorKind::Other, "Simulation "
+        Ok(())
+    }
+
+    /// Returns true if the project manager is in the recovery mode
+    pub fn is_recovery(&self) -> bool {
+        self.recovery_mode
     }
 
     // Checks if the project directory already exists
@@ -231,9 +258,31 @@ impl ProjectManager {
         ))
     }
 
-    // TODO
     // Creates the project directories
     fn initialize_directory_structure(&mut self) -> Result<(), Error> {
+        // match self.directory_structure {
+        //     DirectoryStructure::Series { n_runs } =>
+        // }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn initialize_simple() {
+        // Get a path to a new temporary directory
+        let temp_dir =
+            tempdir().expect("Failed to initialize a temporary directory.");
+        let path = temp_dir.path().join("project");
+
+        let mut project_manager = ProjectManager::new_simple(path);
+
+        project_manager
+            .initialize_project()
+            .expect("Failed to initialize a simple project directory");
     }
 }
