@@ -65,10 +65,10 @@ impl ProjectManifest {
         self.metadata.end_time.is_some()
     }
 
-    pub fn write(&self, path: &PathBuf) -> Result<(), Error> {
+    pub fn write<P: AsRef<PathBuf>>(&self, path: P) -> Result<(), Error> {
         let toml_string = toml::to_string_pretty(self)
             .expect("Failed to convert manifest to toml string.");
-        let manifest_path = path.join("manifest.toml");
+        let manifest_path = path.as_ref().join("manifest.toml");
 
         write(manifest_path, toml_string)
     }
