@@ -2,8 +2,8 @@
 pub mod files;
 pub use files::FileManager;
 
-pub mod initialize;
-pub use crate::initialize::{BuildError, BuilderMethods, TargetFromBuilder};
+pub mod builder;
+pub use crate::builder::{BuildError, BuilderMethods, TargetFromBuilder};
 
 //pub mod output;
 pub mod project_setup;

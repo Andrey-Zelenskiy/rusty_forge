@@ -44,10 +44,11 @@ pub trait TargetFromBuilder {
         Self: Sized,
     {
         //Populate the parameters from the config
-        match config.get::<Self::Builder>(config_name) {
-            Ok(mut builder) => builder.build(),
-            Err(reason) => panic!("Missing config for {config_name}: {reason}"),
-        }
+        let mut builder = config
+            .get::<Self::Builder>(config_name)
+            .map_err(BuildError::from)?;
+
+        builder.build()
     }
 }
 

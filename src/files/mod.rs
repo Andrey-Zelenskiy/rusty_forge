@@ -251,7 +251,7 @@ mod tests {
 
     use super::*;
 
-    use crate::initialize::{BuilderMethods, TargetFromBuilder};
+    use crate::builder::{BuilderMethods, TargetFromBuilder};
 
     #[test]
     fn build_file_manager() {

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::initialize::{BuilderMethods, TargetFromBuilder};
+use crate::builder::{BuilderMethods, TargetFromBuilder};
 
 use super::FileManager;
 
