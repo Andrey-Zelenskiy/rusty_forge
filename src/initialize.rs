@@ -596,7 +596,7 @@ impl IntegerArrayInitializer {
     ///   .initialize(10)
     ///   .unwrap();
     /// ```
-    pub fn new_random_uniform(min: u32, max: u32) -> Self {
+    pub fn new_uniform(min: u32, max: u32) -> Self {
         Self::RandomUniform { min, max }
     }
 
