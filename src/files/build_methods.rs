@@ -1,5 +1,5 @@
 // Copyright Andrey Zelenskiy, 2024-2026
-//
+
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};

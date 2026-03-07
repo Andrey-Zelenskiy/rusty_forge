@@ -1,9 +1,6 @@
 // Copyright Andrey Zelenskiy, 2024-2026
 
-use std::{
-    error::Error,
-    fmt::{self, Display},
-};
+use std::{error::Error, fmt};
 
 use config::{Config, ConfigError};
 use serde::{Deserialize, Serialize};
@@ -61,14 +58,14 @@ pub enum BuildError {
     IncompleteBuilderData { reason: String },
 }
 
-impl Display for BuildError {
+impl fmt::Display for BuildError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ConfigError { reason } => {
-                writeln!(f, "Could not build target from config: {reason}")
+                write!(f, "Could not build target from config: {reason}")
             }
             Self::IncompleteBuilderData { reason } => {
-                writeln!(f, "Builder missing required fields: {reason}")
+                write!(f, "Builder missing required fields: {reason}")
             }
         }
     }
