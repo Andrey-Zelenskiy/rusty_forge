@@ -11,14 +11,8 @@ pub trait BuilderMethods:
 {
     type Target;
 
-    /// User implementation of the target build
-    fn try_build(&mut self) -> Result<Self::Target, String>;
-
     /// Initialize target structure from the parameters
-    fn build(&mut self) -> Result<Self::Target, BuildError> {
-        self.try_build()
-            .map_err(|s| BuildError::IncompleteBuilderData { reason: s })
-    }
+    fn build(&mut self) -> Result<Self::Target, BuildError>;
 
     /// Create a builder from the existing target
     fn from_target(target: &Self::Target) -> Self;
@@ -114,7 +108,7 @@ mod tests {
     impl BuilderMethods for BuilderExplicit {
         type Target = TargetExplicit;
 
-        fn try_build(&mut self) -> Result<Self::Target, String> {
+        fn build(&mut self) -> Result<Self::Target, BuildError> {
             Ok(Self::Target {
                 x2: self.x * self.x,
                 xy: self.x * self.y,
@@ -160,15 +154,17 @@ mod tests {
     impl BuilderMethods for BuilderOption {
         type Target = TargetOption;
 
-        fn try_build(&mut self) -> Result<Self::Target, String> {
+        fn build(&mut self) -> Result<Self::Target, BuildError> {
             match (self.x, self.y) {
                 (Some(x_value), Some(y_value)) => Ok(TargetOption {
                     sum: x_value + y_value,
                     diff: x_value - y_value,
                 }),
-                _ => Err("Both x and y must be specified to \
+                _ => Err(BuildError::IncompleteBuilderData {
+                    reason: "Both x and y must be specified to \
                         initialize TargetOption. "
-                    .to_string()),
+                        .to_string(),
+                }),
             }
         }
 

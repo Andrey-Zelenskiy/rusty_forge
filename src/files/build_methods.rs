@@ -4,7 +4,10 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::builder::{BuilderMethods, TargetFromBuilder};
+use crate::{
+    builder::{BuilderMethods, TargetFromBuilder},
+    BuildError,
+};
 
 use super::FileManager;
 
@@ -66,7 +69,7 @@ impl FileManagerBuilder {
 impl BuilderMethods for FileManagerBuilder {
     type Target = FileManager;
 
-    fn try_build(&mut self) -> Result<Self::Target, String> {
+    fn build(&mut self) -> Result<Self::Target, BuildError> {
         // Ensure that the required components are specified
         match (&self.project_dir, &self.name, &self.extension) {
             (Some(project_dir), Some(name), Some(extension)) => {
@@ -130,11 +133,13 @@ impl BuilderMethods for FileManagerBuilder {
                     },
                 ];
 
-                Err(format!(
-                    "FileManager requires project_dir ({}), name ({}), \
+                Err(BuildError::IncompleteBuilderData {
+                    reason: format!(
+                        "FileManager requires project_dir ({}), name ({}), \
                         and extension ({}).",
-                    values[0], values[1], values[2]
-                ))
+                        values[0], values[1], values[2]
+                    ),
+                })
             }
         }
     }
