@@ -1,5 +1,297 @@
 // Copyright Andrey Zelenskiy, 2024-2026
 
+//! This module defines methods for defining builders of custom types,
+//! following the [Builder pattern](rust-unofficial.fithub.io/patterns/patterns/creational/builder.html).
+//!
+//! The key idea is to have two types: one with mutable data  (Builder) used
+//! for the allocation, and the other (Target) with private data used for
+//! performing functions:
+//!
+//! ```rust,ignore
+//! let target = Target::builder() // Creates Builder::default()
+//!   .set_field(value)            // Allocates data to the Builder,
+//!   ...                          // returns &mut Builder
+//!   .build();                    // Returns Result<Target, Error>
+//! ```
+//!
+//! This can be implemented using a pair of traits, [BuilderMethods] and
+//! [TargetFromBuilder], which respectively define the methods for
+//! Builder and Target types.
+//!
+//! ```rust
+//! use rusty_forge::{BuilderMethods, TargetFromBuilder, BuildError};
+//!
+//! // Define the target structure
+//! pub struct MyStruct {
+//!     sum: i32,
+//!     diff: i32,
+//! }
+//!
+//! // Define the builder structure
+//! #[derive(Default, serde::Deserialize, serde::Serialize)]
+//! pub struct MyStructBuilder {
+//!     x: Option<i32>,
+//!     y: Option<i32>,
+//! }
+//!
+//! // Define methods to allocate data to the builder
+//! impl MyStructBuilder {
+//!   pub fn set_x(&mut self, value: i32) -> &mut Self {
+//!     self.x = Some(value);
+//!     self
+//!   }
+//!
+//!   pub fn set_y(&mut self, value: i32) -> &mut Self {
+//!     self.y = Some(value);
+//!     self
+//!   }
+//! }
+//!
+//! // Implement the required methods for building MyStruct
+//! impl BuilderMethods for MyStructBuilder {
+//!     // Which type are we constructing
+//!     type Target = MyStruct;
+//!
+//!     // Logic to build the target from the data in the builder
+//!     fn build(&mut self) -> Result<Self::Target, BuildError> {
+//!         match (self.x, self.y) {
+//!             (Some(x_value), Some(y_value)) => Ok(Self::Target {
+//!                 sum: x_value + y_value,
+//!                 diff: x_value - y_value,
+//!             }),
+//!             _ => Err(BuildError::IncompleteBuilderData {
+//!                 reason: "Both x and y must be specified to \
+//!                     initialize TargetOption. "
+//!                     .to_string(),
+//!             }),
+//!         }
+//!     }
+//!
+//!     // Logic to create the builder given the target data
+//!     fn from_target(target: &Self::Target) -> Self {
+//!         let x = (target.sum + target.diff) / 2;
+//!         let y = (target.sum - target.diff) / 2;
+//!         Self {
+//!             x: Some(x),
+//!             y: Some(y),
+//!         }
+//!     }
+//!
+//! }
+//!
+//! impl TargetFromBuilder for MyStruct {
+//!     type Builder = MyStructBuilder;
+//! }
+//! ```
+//! A couple of comments are worth making at this point.
+//! Note that the logic defined in [BuilderMethods] and [TargetFromBuilder]
+//! assumes one-to-one relationship, i.e. there can only be one builder for
+//! a given target.
+//! The [BuilderMethods::from_target()] method is required in order to easily
+//! serialize and output the builder data, for future initializations.
+//!
+//! ## [BuilderSetter](builder_derive/derive.BuilderSetters.html) derive macro
+//!
+//! To eliminate boilerplate, [builder](rusty_forge/builder) module implements
+//! a derive macro for automatic definition of setters for both Structs and
+//! Enums.
+//! The `impl MyStructBuilder` block in the example above can be removed by
+//! adding a new derive trait:
+//!
+//! ```rust,ignore
+//! use rusty_forge::{BuilderMethods, TargetFromBuilder, BuilderSetters};
+//!
+//! // Define the target structure
+//! pub struct MyStruct {
+//!     sum: i32,
+//!     diff: i32,
+//! }
+//!
+//! // Define the builder structure
+//! #[derive(BuilderSetters, Default, serde::Deserialize, serde::Serialize)]
+//! pub struct MyStructBuilder {
+//!     x: Option<i32>,
+//!     y: Option<i32>,
+//! }
+//!
+//! // Same implementations of BuilderMethods and TargetFromBuilder as above
+//! ```
+//! In this example, [BuilderSetters](builder_derive/derive.BuilderSetters.html)
+//! automatically defines `.set_x()` and `.set_y()`, which take in [i32] and
+//! set the values to [`Some<T>`].
+//! For non-option values, this derive macro defines a setter to the respective
+//! field type:
+//!
+//! ```rust
+//! use rusty_forge::BuilderSetters;
+//!
+//! #[derive(BuilderSetters)]
+//! struct Builder {
+//!   x: i32,
+//!   y: Option<i32>
+//! }
+//!
+//! // Same as
+//! //
+//! // impl Builder {
+//! //   pub fn set_x(value: i32) -> &mut Self {
+//! //     self.x = value;
+//! //     self
+//! //   }
+//! //
+//! //   pub fn set_y(value: i32) -> &mut Self {
+//! //     self.y = Some(value);
+//! //     self
+//! //   }
+//! // }
+//!
+//! ```
+//!
+//! If one of the fields of the structure already implements
+//! [BuilderSetter](builder_derive/derive.BuilderSetters.html),
+//! we can indicate it by a special attribute:
+//!
+//! ```rust
+//! use rusty_forge::BuilderSetters;
+//!
+//! #[derive(BuilderSetters, Default)]
+//! struct Complex {
+//!   real: f64,
+//!   imag: f64
+//! }
+//!
+//! #[derive(BuilderSetters, Default)]
+//! struct Builder {
+//!   x: f64,
+//!   y: Option<f64>,
+//!   #[setter(nested)]
+//!   z: Complex,
+//! }
+//!
+//! // This allows us to define all nested fields
+//! let builder = Builder::default()
+//!   .set_x(1.0)
+//!   .set_y(0.0)
+//!   .set_z(|s| s.set_real(1.0).set_imag(0.0));
+//!```
+//!
+//! This trait works also on Enums:
+//!
+//! ```rust
+//! use rusty_forge::BuilderSetters;
+//!
+//! // Enum representing initialization options of a float scalar
+//! #[derive(BuilderSetters, Default)]
+//! enum ScalarBuilder {
+//!   // Initializes to zero, no parameters needed
+//!   #[default]
+//!   Zero,
+//!   // Initializes to the input value
+//!   FromValue(f64),
+//!   // Initializes from a uniform random distribution with specified bounds
+//!   UniformDistribution {min: f64, max: f64},
+//! }
+//!
+//! let builder_value = ScalarBuilder::default()
+//!   .set_zero();
+//!
+//! let builder_value = ScalarBuilder::default()
+//!   .set_from_value(1.0);
+//!
+//! let builder_value = ScalarBuilder::default()
+//!   .set_uniform_distribution(-1.0, 1.0);
+//! ```
+//!
+//! ## [BuilderFromTargets](builder_derive/derive.BuilderFromTargets.html) derive macro
+//!
+//! If we are dealing with a structure whose fields are types that implement
+//! [TargetFromBuilder], then we can use
+//! [BuilderFromTargets](builder_derive/derive.BuilderFromTargets.html) macro to
+//! automatically define a corresponding builder structure:
+//!
+//! ```rust
+//! use rusty_forge::{
+//!   BuilderMethods,
+//!   TargetFromBuilder,
+//!   BuildError,
+//!   BuilderSetters,
+//!   BuilderFromTargets,
+//! };
+//!
+//! use std::path::PathBuf;
+//!
+//! pub struct MyStruct {
+//!     sum: i32,
+//!     diff: i32,
+//! }
+//!
+//! #[derive(BuilderSetters, Default, serde::Deserialize, serde::Serialize)]
+//! pub struct MyStructBuilder {
+//!     x: Option<i32>,
+//!     y: Option<i32>,
+//! }
+//!
+//! // Implement the required methods for building MyStruct
+//! impl BuilderMethods for MyStructBuilder {
+//!     type Target = MyStruct;
+//!
+//!     fn build(&mut self) -> Result<Self::Target, BuildError> {
+//!         match (self.x, self.y) {
+//!             (Some(x_value), Some(y_value)) => Ok(Self::Target {
+//!                 sum: x_value + y_value,
+//!                 diff: x_value - y_value,
+//!             }),
+//!             _ => Err(BuildError::IncompleteBuilderData {
+//!                 reason: "Both x and y must be specified to \
+//!                     initialize MyStruct. "
+//!                     .to_string(),
+//!             }),
+//!         }
+//!     }
+//!
+//!     fn from_target(target: &Self::Target) -> Self {
+//!         let x = (target.sum + target.diff) / 2;
+//!         let y = (target.sum - target.diff) / 2;
+//!         Self {
+//!             x: Some(x),
+//!             y: Some(y),
+//!         }
+//!     }
+//!
+//! }
+//!
+//! impl TargetFromBuilder for MyStruct {
+//!     type Builder = MyStructBuilder;
+//! }
+//!
+//! // Automatically create a builder struct with derived BuilderSetter,
+//! // and implement TargetFromBuilder for Target
+//! #[derive(BuilderFromTargets)]
+//! pub struct Target {
+//!   #[builder(nested)] // Flag the fields that will use nested setters
+//!   t1: MyStruct,
+//!   #[builder(nested)]
+//!   t2: MyStruct,
+//!   scalar: f64,       // Simple types implement BuilderMethods and
+//!   vector: Vec<f64>,  // TargetFromBuilder as their own Builders and
+//!   path: PathBuf,     // Targets
+//! }
+//!
+//! let target = Target::builder()      // Creates TargetBuilder::default()
+//!   .set_t1(|s| s.set_x(1).set_y(1))  // Allocates data to the two fields
+//!   .set_t2(|s| s.set_x(1).set_y(2))  // with custom Builders
+//!   .set_scalar(2.0)                  // Allocate fields that are their own
+//!   .set_vector(vec![1.0, 1.0, 0.0])  // Builders
+//!   .set_path("/tmp/")                //
+//!   .build()
+//!   .unwrap();                        // Creates Target structure
+//!
+//! ```
+//!
+//! Since [BuilderMethods] and [TargetFromBuilder] traits are implemented for
+//! many common types, such as scalaras and arrays, one can further minimize
+//! the number of manual implementations of these traits.
+
 use std::{error::Error, fmt, path::PathBuf};
 
 use config::{Config, ConfigError};
@@ -302,9 +594,16 @@ mod tests {
 
     #[derive(BuilderFromTargets)]
     pub struct TargetComposite {
+        #[builder(nested)]
         t1: TargetExplicit,
+        #[builder(nested)]
         t2: TargetExplicit,
+        #[builder(nested)]
         t3: TargetOption,
+        scalar: f64,
+        vector: Vec<f64>,
+        string: String,
+        path: PathBuf,
     }
 
     #[test]
@@ -340,11 +639,33 @@ mod tests {
     }
 
     #[test]
+    fn enum_setter() {
+        #[derive(Default, BuilderSetters)]
+        enum Builder {
+            #[default]
+            Zero,
+            #[allow(dead_code)]
+            FromValue(f64),
+            #[allow(dead_code)]
+            UniformDistribution { min: f64, max: f64 },
+        }
+
+        let _ = Builder::default()
+            .set_zero()
+            .set_from_value(1.0)
+            .set_uniform_distribution(-1.0, 1.0);
+    }
+
+    #[test]
     fn builder_macro() {
         let target = TargetComposite::builder()
             .set_t1(|s| s.set_x(1_u32).set_y(2_u32))
             .set_t2(|s| s.set_x(2_u32).set_y(3_u32))
             .set_t3(|s| s.set_x(1).set_y(2))
+            .set_scalar(1.0)
+            .set_vector(vec![1.0, 2.0, 3.0])
+            .set_string("one")
+            .set_path("/tmp/")
             .build()
             .expect("Failed to build a composite target");
 
@@ -358,5 +679,10 @@ mod tests {
 
         assert_eq!(3, target.t3.sum);
         assert_eq!(-1, target.t3.diff);
+
+        assert_eq!(1.0, target.scalar);
+        assert_eq!(vec![1.0, 2.0, 3.0], target.vector);
+        assert_eq!("one", target.string);
+        assert_eq!(PathBuf::from("/tmp/"), target.path);
     }
 }
