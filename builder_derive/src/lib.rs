@@ -1,5 +1,6 @@
 // Copyright Andrey Zelenskiy, 2024-2026
 
+use convert_case::ccase;
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{
@@ -93,13 +94,13 @@ fn generate_struct_setters(data: &DataStruct) -> proc_macro2::TokenStream {
 fn generate_enum_setters(data: &DataEnum) -> proc_macro2::TokenStream {
     let variants = data.variants.iter().map(|v| {
         let var_name = &v.ident;
-        let method_name = format_ident!("set_{}", var_name.to_string().to_lowercase());
+        let method_name = format_ident!("set_{}", ccase!(snake, var_name.to_string()));
 
         // Check enum structure
         match &v.fields {
             Fields::Unit => quote! {
                 pub fn #method_name(&mut self) -> &mut Self {
-                    self = Self::#var_name;
+                    *self = Self::#var_name;
                     self
                 }
             },
@@ -108,8 +109,8 @@ fn generate_enum_setters(data: &DataEnum) -> proc_macro2::TokenStream {
                 let types = f.unnamed.iter().map(|field| &field.ty);
                 let args = (0..f.unnamed.len()).map(|i| format_ident!("arg{}",i)).collect::<Vec<_>>();
                 quote! {
-                    pub fn #method_name<#(#args: Into<#types>),*>(&mut self, #(#args: #args),*) - &mut Self {
-                        self = Self::#var_name(#(#args.into()),*)
+                    pub fn #method_name<#(#args: Into<#types>),*>(&mut self, #(#args: #args),*) -> &mut Self{
+                        *self = Self::#var_name(#(#args.into()),*);
                         self
                     }
                 }
@@ -119,7 +120,8 @@ fn generate_enum_setters(data: &DataEnum) -> proc_macro2::TokenStream {
                 let types = f.named.iter().map(|field| &field.ty);
                 quote! {
                     pub fn #method_name<#(#idents:Into<#types>),*>(&mut self, #(#idents: #idents),*) -> &mut Self {
-                        self = Self::#var_name {#(#idents: #idents.into()),*}
+                        *self = Self::#var_name {#(#idents: #idents.into()),*};
+                        self
                     }
                 }
             }
@@ -146,7 +148,7 @@ fn get_option_inner_type(ty: &Type) -> Option<&Type> {
 }
 
 // Derive for structs consisting of types that implement TargetFromBuilder
-#[proc_macro_derive(BuilderFromTargets)]
+#[proc_macro_derive(BuilderFromTargets, attributes(builder))]
 pub fn derive_builder_from_targets(input: TokenStream) -> TokenStream {
     // Get information about the structure
     let input = parse_macro_input!(input as DeriveInput);
@@ -168,8 +170,29 @@ pub fn derive_builder_from_targets(input: TokenStream) -> TokenStream {
         let name = &f.ident;
         let ty = &f.ty;
 
+        let mut is_nested = false;
+        for attr in &f.attrs {
+            if attr.path().is_ident("builder") {
+                let _ = attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("nested") {
+                        is_nested = true;
+                    }
+                    Ok(())
+                });
+            }
+        }
+
         // Use the TargetFromBuilder to find the right Builder type
-        quote! { pub #name: <#ty as TargetFromBuilder>::Builder }
+        if is_nested {
+            quote! {
+                #[setter(nested)]
+                pub #name: <#ty as TargetFromBuilder>::Builder
+            }
+        } else {
+            quote! {
+                pub #name: <#ty as TargetFromBuilder>::Builder
+            }
+        }
     });
 
     // Command to iteratively build the fields
@@ -193,7 +216,6 @@ pub fn derive_builder_from_targets(input: TokenStream) -> TokenStream {
         #[derive(BuilderSetters, Default, serde::Serialize, serde::Deserialize)]
         pub struct #builder_name {
             #(
-                #[setter(nested)]
                 #builder_fields,
             )*
         }
