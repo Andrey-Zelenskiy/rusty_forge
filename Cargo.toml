@@ -10,13 +10,14 @@ keywords = ["numerical simulations", "utilities"]
 categorier = ["filesystem", "science", "development-tools::build-utils"]
 
 [dependencies]
+builder_derive = { path = "./builder_derive" }
 chrono = { version = "0.4", features = [ "serde" ] }
 config = "0.15"
 rand = "0.9"
 rand_distr = "0.5"
 rayon = "1.11"
 regex = "1.12"
-serde = { version = "1.0", features = [ "derive" ] }
+serde = { version = "1.0.147", features = [ "derive" ] }
 sysinfo = "0.38"
 tempfile = "3.26"
 toml = "0.8"
