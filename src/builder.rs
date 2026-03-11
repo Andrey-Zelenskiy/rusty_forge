@@ -19,7 +19,7 @@
 //! Builder and Target types.
 //!
 //! ```rust
-//! use rusty_forge::{BuilderMethods, TargetFromBuilder, BuildError};
+//! use rusty_forge::builder::prelude::*;
 //!
 //! // Define the target structure
 //! pub struct MyStruct {
@@ -99,7 +99,7 @@
 //! adding a new derive trait:
 //!
 //! ```rust,ignore
-//! use rusty_forge::{BuilderMethods, TargetFromBuilder, BuilderSetters};
+//! use rusty_forge::builder::prelude::*;
 //!
 //! // Define the target structure
 //! pub struct MyStruct {
@@ -123,7 +123,7 @@
 //! field type:
 //!
 //! ```rust
-//! use rusty_forge::BuilderSetters;
+//! use rusty_forge::builder::prelude::*;
 //!
 //! #[derive(BuilderSetters)]
 //! struct Builder {
@@ -152,7 +152,7 @@
 //! we can indicate it by a special attribute:
 //!
 //! ```rust
-//! use rusty_forge::BuilderSetters;
+//! use rusty_forge::builder::prelude::*;
 //!
 //! #[derive(BuilderSetters, Default)]
 //! struct Complex {
@@ -178,7 +178,7 @@
 //! This trait works also on Enums:
 //!
 //! ```rust
-//! use rusty_forge::BuilderSetters;
+//! use rusty_forge::builder::prelude::*;
 //!
 //! // Enum representing initialization options of a float scalar
 //! #[derive(BuilderSetters, Default)]
@@ -210,13 +210,7 @@
 //! automatically define a corresponding builder structure:
 //!
 //! ```rust
-//! use rusty_forge::{
-//!   BuilderMethods,
-//!   TargetFromBuilder,
-//!   BuildError,
-//!   BuilderSetters,
-//!   BuilderFromTargets,
-//! };
+//! use rusty_forge::builder::prelude::*;
 //!
 //! use std::path::PathBuf;
 //!
@@ -296,6 +290,11 @@ use std::{error::Error, fmt, path::PathBuf};
 
 use config::{Config, ConfigError};
 use serde::{Deserialize, Serialize};
+
+pub mod prelude {
+    pub use super::{BuildError, BuilderMethods, TargetFromBuilder};
+    pub use builder_derive::{BuilderFromTargets, BuilderSetters};
+}
 
 /// Trait for argument structure with required initialization function
 pub trait BuilderMethods:
@@ -501,19 +500,6 @@ mod tests {
         y: u32,
     }
 
-    // Add methods for setting values
-    // impl BuilderExplicit {
-    //     pub fn set_x(&mut self, x: u32) -> &mut Self {
-    //         self.x = x;
-    //         self
-    //     }
-
-    //     pub fn set_y(&mut self, y: u32) -> &mut Self {
-    //         self.y = y;
-    //         self
-    //     }
-    // }
-
     impl BuilderMethods for BuilderExplicit {
         type Target = TargetExplicit;
 
@@ -547,18 +533,6 @@ mod tests {
         x: Option<i32>,
         y: Option<i32>,
     }
-
-    // impl BuilderOption {
-    //     pub fn set_x(&mut self, value: i32) -> &mut Self {
-    //         self.x = Some(value);
-    //         self
-    //     }
-
-    //     pub fn set_y(&mut self, value: i32) -> &mut Self {
-    //         self.y = Some(value);
-    //         self
-    //     }
-    // }
 
     impl BuilderMethods for BuilderOption {
         type Target = TargetOption;
