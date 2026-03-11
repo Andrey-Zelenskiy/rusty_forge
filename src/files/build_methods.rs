@@ -5,14 +5,14 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    builder::{BuilderMethods, TargetFromBuilder},
-    BuildError,
+    builder::prelude::*,
+    files::{FileSerialization, FileStatus},
 };
 
 use super::FileManager;
 
 /// Builder of FileManager
-#[derive(Default, Deserialize, Serialize)]
+#[derive(BuilderSetters, Default, Deserialize, Serialize)]
 pub struct FileManagerBuilder {
     // Project root directory
     project_dir: Option<PathBuf>,
@@ -22,48 +22,8 @@ pub struct FileManagerBuilder {
     name: Option<String>,
     // File extension
     extension: Option<String>,
-    // Option for file series
-    series: Option<usize>,
-}
-
-impl FileManagerBuilder {
-    // Setter methods
-
-    /// Sets project root directory
-    pub fn set_project_dir<T>(&mut self, project_dir: T) -> &mut Self
-    where
-        PathBuf: From<T>,
-    {
-        self.project_dir = Some(PathBuf::from(project_dir));
-        self
-    }
-
-    /// Sets subdirectory of the data
-    pub fn set_output_dir<T>(&mut self, output_dir: T) -> &mut Self
-    where
-        PathBuf: From<T>,
-    {
-        self.output_dir = Some(PathBuf::from(output_dir));
-        self
-    }
-
-    /// Sets file name
-    pub fn set_name<T: ToString>(&mut self, name: T) -> &mut Self {
-        self.name = Some(name.to_string());
-        self
-    }
-
-    /// Sets file extension
-    pub fn set_extension<T: ToString>(&mut self, extension: T) -> &mut Self {
-        self.extension = Some(extension.to_string());
-        self
-    }
-
-    /// Specifies manager for a series of n_files outputs
-    pub fn set_series(&mut self, n_files: usize) -> &mut Self {
-        self.series = Some(n_files);
-        self
-    }
+    // Option for file series (optinal number of files)
+    series: Option<Option<usize>>,
 }
 
 impl BuilderMethods for FileManagerBuilder {
@@ -71,20 +31,20 @@ impl BuilderMethods for FileManagerBuilder {
 
     fn build(&mut self) -> Result<Self::Target, BuildError> {
         // Ensure that the required components are specified
-        match (&self.project_dir, &self.name, &self.extension) {
-            (Some(project_dir), Some(name), Some(extension)) => {
+        match (&self.output_dir, &self.name, &self.extension) {
+            (Some(output_dir), Some(name), Some(extension)) => {
                 // Construct the path to output
                 let mut path = PathBuf::new();
 
                 // Project root
-                path.push(project_dir);
-
-                // Output subdirectory
-                let output_dir = match &self.output_dir {
-                    Some(output_path) => output_path,
+                let project_dir = match &self.project_dir {
+                    Some(project_path) => project_path,
                     None => &PathBuf::new(),
                 };
 
+                path.push(project_dir);
+
+                // Output subdirectory
                 path.push(output_dir);
 
                 // File name
@@ -97,24 +57,31 @@ impl BuilderMethods for FileManagerBuilder {
                 path.push(filename);
 
                 // File extension
+                let serialization = match extension.as_str() {
+                    "toml" => FileSerialization::Toml,
+                    "json" => FileSerialization::Json,
+                    _ => FileSerialization::None,
+                };
+
                 path.set_extension(extension);
 
                 Ok(Self::Target {
-                    project_dir: PathBuf::from(project_dir),
-                    output_dir: self.output_dir.clone(),
+                    project_dir: self.project_dir.clone(),
+                    output_dir: PathBuf::from(output_dir),
                     name: name.to_string(),
                     extension: extension.to_string(),
                     series: self.series.map(|n| (n, 0)),
                     path,
-                    writable: false,
+                    status: FileStatus::NotInitialized,
+                    serialization,
                 })
             }
             _ => {
                 let values = [
                     {
-                        match &self.project_dir {
+                        match &self.output_dir {
                             Some(s) => String::from(
-                                s.to_str().expect("Missing project root path"),
+                                s.to_str().expect("Missing output path"),
                             ),
                             None => String::from("NOT_SPECIFIED"),
                         }
@@ -135,7 +102,7 @@ impl BuilderMethods for FileManagerBuilder {
 
                 Err(BuildError::IncompleteBuilderData {
                     reason: format!(
-                        "FileManager requires project_dir ({}), name ({}), \
+                        "FileManager requires output_dir ({}), name ({}), \
                         and extension ({}).",
                         values[0], values[1], values[2]
                     ),
@@ -146,8 +113,8 @@ impl BuilderMethods for FileManagerBuilder {
 
     fn from_target(target: &Self::Target) -> Self {
         Self {
-            project_dir: Some(PathBuf::from(&target.project_dir)),
-            output_dir: target.output_dir.clone(),
+            project_dir: target.project_dir.clone(),
+            output_dir: Some(PathBuf::from(&target.output_dir)),
             name: Some(target.name.to_string()),
             extension: Some(target.extension.to_string()),
             series: target.series.map(|(n, _)| n),

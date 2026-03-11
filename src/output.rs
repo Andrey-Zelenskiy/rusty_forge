@@ -4,8 +4,8 @@ use std::{fmt, io::Write};
 use serde::Serialize;
 
 use crate::{
-    files_legacy::FileManager,
-    initialize::{BuilderMethods, TargetFromBuilder},
+    builder::{BuilderMethods, TargetFromBuilder},
+    files::FileManager,
 };
 
 /// OutputMethods - initialization and output setup
