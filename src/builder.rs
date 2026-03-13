@@ -580,6 +580,16 @@ mod tests {
         path: PathBuf,
     }
 
+    #[derive(Default, BuilderSetters)]
+    pub enum Builder {
+        #[allow(dead_code)]
+        UniformDistribution { min: f64, max: f64 },
+        #[default]
+        Zero,
+        #[allow(dead_code)]
+        FromValue(f64),
+    }
+
     #[test]
     fn build() {
         let target = TargetExplicit::builder()
@@ -614,16 +624,6 @@ mod tests {
 
     #[test]
     fn enum_setter() {
-        #[derive(Default, BuilderSetters)]
-        enum Builder {
-            #[default]
-            Zero,
-            #[allow(dead_code)]
-            FromValue(f64),
-            #[allow(dead_code)]
-            UniformDistribution { min: f64, max: f64 },
-        }
-
         let _ = Builder::default()
             .set_zero()
             .set_from_value(1.0)

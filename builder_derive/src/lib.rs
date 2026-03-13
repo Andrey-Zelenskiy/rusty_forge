@@ -118,8 +118,14 @@ fn generate_enum_setters(data: &DataEnum) -> proc_macro2::TokenStream {
             Fields::Named(f) => {
                 let idents = f.named.iter().map(|field| &field.ident).collect::<Vec<_>>();
                 let types = f.named.iter().map(|field| &field.ty);
+
+                // Create new identifiers for the Generics
+                let generic_params = idents.iter().map(|id| {
+                    format_ident!("T{}", id.as_ref().unwrap())
+                }).collect::<Vec<_>>();
+                
                 quote! {
-                    pub fn #method_name<#(#idents:Into<#types>),*>(&mut self, #(#idents: #idents),*) -> &mut Self {
+                    pub fn #method_name<#(#generic_params:Into<#types>),*>(&mut self, #(#idents: #generic_params),*) -> &mut Self {
                         *self = Self::#var_name {#(#idents: #idents.into()),*};
                         self
                     }
