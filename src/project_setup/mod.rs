@@ -10,24 +10,26 @@
 //! ## Example
 //!
 //! ```rust
-//! use rusty_forge::project_setup::ProjectManager;
+//! use rusty_forge::ProjectManager;
 //! ```
 
 use std::{
-    fs,
-    io::{Error, ErrorKind},
+    fs, io,
     path::{Path, PathBuf},
 };
 
 use config::Config;
+
 use regex::Regex;
 
 use serde::Deserialize;
 
+use crate::FileManager;
+
 mod manifest;
 use manifest::ProjectManifest;
 
-/// Project directory initializer
+/// Structure that manages project directory throughout simulation
 #[derive(Deserialize, Debug)]
 pub struct ProjectManager {
     /// Path to the project directory
@@ -35,22 +37,12 @@ pub struct ProjectManager {
     /// Recovery mode option for restarting a simulation from the last
     /// checkpoint
     #[serde(default)]
-    recovery_mode: bool,
-    /// Template structure of project directory
-    directory_structure: DirectoryStructure,
+    recovery_mode: Option<usize>,
+    /// Option to timestamp the name of the project directory with /yyy-mm-dd/
+    #[serde(default)]
+    timestamped: bool,
     /// Type of behaviour if project path already exists
     data_protocol: DataProtocol,
-}
-
-/// Project directory tree formats
-#[derive(Deserialize, Debug, PartialEq, Eq)]
-pub enum DirectoryStructure {
-    /// Create a series of subdirectories
-    Series { n_runs: usize },
-    /// Store data directly in the project directory, specified by the path
-    Simple,
-    /// Create a subdirectory labelled by /yyyy-mm-dd/
-    Timestamped,
 }
 
 /// Protocol for dealing with files that already exist
@@ -63,7 +55,7 @@ pub enum DataProtocol {
 }
 
 impl ProjectManager {
-    /// Simple project structure: new directory without timestamps or series,
+    /// Simple project structure: new directory without timestamps,
     /// panics if already exists
     ///
     /// ## Examples
@@ -78,40 +70,77 @@ impl ProjectManager {
     pub fn new_simple<P: AsRef<Path>>(path: P) -> Self {
         Self {
             path: PathBuf::from(path.as_ref()),
-            recovery_mode: false,
-            directory_structure: DirectoryStructure::Simple,
+            recovery_mode: None,
+            timestamped: false,
             data_protocol: DataProtocol::Panic,
         }
     }
 
-    /// Initializes simulation directory
+    /// Initializes project, depending on the recovery option
     ///
     ///
-    pub fn initialize_project(&mut self) -> Result<(), Error> {
-        // Check if the directory already exists, in which case execute data
-        // protocol
-        if self.exists() {
-            self.execute_data_protocol()?;
+    pub fn initialize_project(&mut self) -> Result<(), io::Error> {
+        // Choose initialization based on the recovery option
+        if self.is_recovery() {
+            self.initialize_recovery()
+        } else {
+            self.initialize_new()
         }
+    }
 
-        self.initialize_directory_structure()?;
+    /// Initializes log files in the project directory
+    pub fn initialize_logs(
+        &mut self,
+        file_managers: &mut Vec<&mut FileManager>,
+    ) -> Result<(), io::Error> {
+        file_managers.iter_mut().try_for_each(|f| {
+            // Add project directory to all files
+            f.set_project_dir(self.path().join("logs"));
 
-        // Check the manifest file for date, complition status
-        // If no manifest, check that the directory is empty
-        // If empty, Ok(()), otherwise ErrorKind::DirectoryNotEmpty
+            f.initialize_open()
+        })?;
 
-        // Timestamped: check if timestamps exist. If yes, create a new one
-        // and return Ok(()). Otherwise, first copy the old data into a
-        // timestamped directory.
-
-        // Recovery: if manifest status is Completed, return
-        // ErrorKind::Other, "Simulation "
         Ok(())
+    }
+
+    /// Initializes checkpoint files in the project directory
+    pub fn initialize_checkpoints(
+        &mut self,
+        file_managers: &mut Vec<&mut FileManager>,
+    ) -> Result<(), io::Error> {
+        file_managers.iter_mut().try_for_each(|f| {
+            // Add project directory to all files
+            f.set_project_dir(self.path().join("checkpoints"));
+
+            f.initialize_open()
+        })?;
+
+        Ok(())
+    }
+
+    /// Initializes output files in the project directory
+    pub fn initialize_data(
+        &mut self,
+        file_managers: &mut Vec<&mut FileManager>,
+    ) -> Result<(), io::Error> {
+        file_managers.iter_mut().try_for_each(|f| {
+            // Add project directory to all files
+            f.set_project_dir(self.path().join("data"));
+
+            f.initialize_append()
+        })?;
+
+        Ok(())
+    }
+
+    /// Returns reference to project's path
+    pub fn path(&self) -> &Path {
+        &self.path
     }
 
     /// Returns true if the project manager is in the recovery mode
     pub fn is_recovery(&self) -> bool {
-        self.recovery_mode
+        self.recovery_mode.is_some()
     }
 
     // Checks if the project directory already exists
@@ -120,7 +149,7 @@ impl ProjectManager {
     }
 
     // Checks if the project directory is timestamped
-    fn is_timestamped(&self) -> bool {
+    fn exists_and_timestamped(&self) -> bool {
         let mut timestamped = false;
 
         if self.exists() {
@@ -128,7 +157,7 @@ impl ProjectManager {
             let re = Regex::new(r"^\d{4}-\d{2}-\d{2}$").unwrap();
 
             // Get items of the directory
-            if let Ok(entries) = fs::read_dir(&self.path) {
+            if let Ok(entries) = fs::read_dir(self.path()) {
                 for entry in entries.flatten() {
                     if let Ok(file_type) = entry.file_type() {
                         // Only care about directories
@@ -155,21 +184,21 @@ impl ProjectManager {
     }
 
     // Loads a preexisting manifest file
-    fn load_manifest(&self) -> Result<ProjectManifest, Error> {
+    fn load_manifest(&self) -> Result<ProjectManifest, io::Error> {
         match Config::builder()
             .add_source(config::File::from(self.path.join("manifest.toml")))
             .build()
         {
             Ok(config) => {
                 config.try_deserialize::<ProjectManifest>().map_err(|e| {
-                    Error::new(
-                        ErrorKind::InvalidData,
+                    io::Error::new(
+                        io::ErrorKind::InvalidData,
                         format!("Failed to deserialize manifest file: {e}"),
                     )
                 })
             }
-            Err(e) => Err(Error::new(
-                ErrorKind::NotFound,
+            Err(e) => Err(io::Error::new(
+                io::ErrorKind::NotFound,
                 format!(
                     "manifest.toml not found in the project directory: {e}"
                 ),
@@ -177,11 +206,49 @@ impl ProjectManager {
         }
     }
 
+    // Prepare for a recovery of an existing project
+    fn initialize_recovery(&mut self) -> Result<(), io::Error> {
+        // Ensure that the directory exists
+        if !self.exists() {
+            Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!(
+                    "Project directory scheduled for recovery does \
+                        not exist: {:#?}",
+                    self.path
+                ),
+            ))?;
+        }
+
+        // Load manifest file
+        //let manifest = self.load_manifest()?;
+
+        // Determine the index of the last saved checkpoint
+        // Locate the checkpoint
+        // Create a new data directory
+        // Return Config
+        Ok(())
+    }
+
+    // Creates a new project, following data safety protocols
+    fn initialize_new(&mut self) -> Result<(), io::Error> {
+        // Check if the directory already exists, in which case execute data
+        // protocol
+        if self.exists() {
+            self.execute_data_protocol()?;
+        }
+
+        // Create project directory and manifest file
+        self.initialize_directory_structure()?;
+
+        Ok(())
+    }
+
     // Method for safely dealing with the existing data
-    fn execute_data_protocol(&mut self) -> Result<(), Error> {
+    fn execute_data_protocol(&mut self) -> Result<(), io::Error> {
         // Check if the existing directory is empty
-        // (no need for data protocols)
-        let mut entries = fs::read_dir(&self.path)?;
+        // (if it is, no need for data protocols)
+        let mut entries = fs::read_dir(self.path())?;
 
         if entries.next().is_some() {
             match &self.data_protocol {
@@ -194,8 +261,8 @@ impl ProjectManager {
     }
 
     // Archives old data in a timestamped directory
-    fn archive_protocol(&mut self) -> Result<(), Error> {
-        if !self.is_timestamped() {
+    fn archive_protocol(&mut self) -> Result<(), io::Error> {
+        if !self.exists_and_timestamped() {
             // Copy data to a timestamped directory
             let manifest = self.load_manifest()?;
 
@@ -212,7 +279,7 @@ impl ProjectManager {
             fs::create_dir(&staging_path)?;
 
             // Snapshot existing files
-            let entries: Vec<PathBuf> = fs::read_dir(&self.path)?
+            let entries: Vec<PathBuf> = fs::read_dir(self.path())?
                 .filter_map(|res| res.ok())
                 .map(|e| e.path())
                 .filter(|p| p != &staging_path)
@@ -233,36 +300,51 @@ impl ProjectManager {
         }
         // Whether or not the data is archived, there will be timestamped
         // directories. To deal with this, we create a new timestamped
-        // directory and append it to path, then make sure that
-        // directory_structure is either Simple or Series.
+        // directory and append it to path
 
         // Append the project path
         self.path = self.path.join(self.create_manifest().timestamp());
 
         // Create a new timestamp directory
-        fs::create_dir(&self.path)?;
+        fs::create_dir(self.path())?;
 
-        // If neccessary, change directory structure
-        if self.directory_structure == DirectoryStructure::Timestamped {
-            self.directory_structure = DirectoryStructure::Simple;
-        }
+        self.timestamped = false;
 
         Ok(())
     }
 
     // Always returns an error
-    fn panic_protocol(&mut self) -> Result<(), Error> {
-        Err(Error::new(
-            ErrorKind::AlreadyExists,
+    fn panic_protocol(&mut self) -> Result<(), io::Error> {
+        Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
             "Project directory already exists.",
         ))
     }
 
     // Creates the project directories
-    fn initialize_directory_structure(&mut self) -> Result<(), Error> {
-        // match self.directory_structure {
-        //     DirectoryStructure::Series { n_runs } =>
-        // }
+    fn initialize_directory_structure(&mut self) -> Result<(), io::Error> {
+        // Create a manifest file
+        let manifest = self.create_manifest();
+
+        // Depending on the option, create a timestamped directory
+        if self.timestamped {
+            self.path = self.path.join(manifest.timestamp());
+
+            fs::create_dir_all(self.path())?;
+        }
+
+        // Save the manifest file
+        manifest.write(self.path())?;
+
+        // Create directory for error and debug messages
+        fs::create_dir_all(self.path().join("logs"))?;
+
+        // Create directory for simulation checkpoints
+        fs::create_dir_all(self.path().join("checkpoints"))?;
+
+        // Create directory for simulation output
+        fs::create_dir_all(self.path().join("data"))?;
+
         Ok(())
     }
 }

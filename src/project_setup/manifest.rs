@@ -12,7 +12,7 @@
 //! use rusty_forge::project_setup::ProjectManager;
 //! ```
 
-use std::{fs::write, io::Error, path::PathBuf};
+use std::{fs::write, io, path::Path};
 
 use chrono::{DateTime, TimeDelta, Utc};
 
@@ -38,6 +38,7 @@ impl ProjectManifest {
 
         Self {
             metadata: SimulationMeta {
+                last_checkpoint: None,
                 start_time: Utc::now(),
                 end_time: None,
                 duration: None,
@@ -60,23 +61,51 @@ impl ProjectManifest {
         self.metadata.start_time.format("%Y-%m-%d").to_string()
     }
 
+    /// Return the index of the last checkpoint
+    #[allow(dead_code)]
+    pub fn last_checkpoint(&self) -> &Option<usize> {
+        &self.metadata.last_checkpoint
+    }
+
+    /// Update checpoint index
+    #[allow(dead_code)]
+    pub fn update_checkpoint(&mut self) {
+        match &self.metadata.last_checkpoint {
+            None => self.metadata.last_checkpoint = Some(0),
+            Some(index) => {
+                self.metadata.last_checkpoint = Some(*index + 1);
+            }
+        }
+    }
+
     /// Check if the program was completed without errors
+    #[allow(dead_code)]
     pub fn is_completed(&self) -> bool {
         self.metadata.end_time.is_some()
     }
 
-    pub fn write<P: AsRef<PathBuf>>(&self, path: P) -> Result<(), Error> {
+    pub fn write<P: AsRef<Path>>(&self, path: P) -> Result<(), io::Error> {
         let toml_string = toml::to_string_pretty(self)
             .expect("Failed to convert manifest to toml string.");
-        let manifest_path = path.as_ref().join("manifest.toml");
+        let manifest_path = path.as_ref().with_file_name("manifest.toml");
 
-        write(manifest_path, toml_string)
+        write(&manifest_path, toml_string).map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                format!(
+                    "Can't initialize manifest.toml at {:?}: {e}",
+                    &manifest_path
+                ),
+            )
+        })
     }
 }
 
 /// State of the program at the start of the run
 #[derive(Deserialize, Serialize, Debug)]
 struct SimulationMeta {
+    // Index of the last checkpoint
+    last_checkpoint: Option<usize>,
     // Start time of the simulation
     start_time: DateTime<Utc>,
     // End time of the simulation

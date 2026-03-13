@@ -4,10 +4,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    builder::prelude::*,
-    files::{FileSerialization, FileStatus},
-};
+use crate::{builder::prelude::*, files::FileStatus};
 
 use super::FileManager;
 
@@ -57,12 +54,6 @@ impl BuilderMethods for FileManagerBuilder {
                 path.push(filename);
 
                 // File extension
-                let serialization = match extension.as_str() {
-                    "toml" => FileSerialization::Toml,
-                    "json" => FileSerialization::Json,
-                    _ => FileSerialization::None,
-                };
-
                 path.set_extension(extension);
 
                 Ok(Self::Target {
@@ -73,7 +64,6 @@ impl BuilderMethods for FileManagerBuilder {
                     series: self.series.map(|n| (n, 0)),
                     path,
                     status: FileStatus::NotInitialized,
-                    serialization,
                 })
             }
             _ => {
