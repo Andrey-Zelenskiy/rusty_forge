@@ -1,5 +1,22 @@
 // Copyright Andrey Zelenskiy, 2024-2026
 
+//! Macros for automatically implementing methods within Builder pattern.
+//!
+//! [`BuilderSetters`] implements `set_` method for each field and variant of
+//! the builder.
+//! __Note:__ the resulting setters carry `#[allow(clippy::too_many_arguments)]`
+//! lint attribute, for cases where the setter methods have too many arguments.
+//!
+//! [`BuilderFromTargets`] derives `BuilderMethods` and `TargetFromBuilder` for
+//! a structure consisting of types that already implement `TargetFromBuilder`.
+//!
+//! ## AI ASSISTED CODE!
+//!
+//! Please note that large parts of these macros were written with the
+//! assistance of Gemini LLM.
+//! The methods have been tested and corrected since the implementation, but
+//! there is still a chance for sloppy implementations.
+
 use convert_case::ccase;
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
@@ -24,6 +41,7 @@ pub fn derive_setters(input: TokenStream) -> TokenStream {
     };
 
     TokenStream::from(quote! {
+        #[allow(clippy::too_many_arguments)]
         impl #impl_generics #name #ty_generics #where_clause {
             #expanded
         }
@@ -121,7 +139,7 @@ fn generate_enum_setters(data: &DataEnum) -> proc_macro2::TokenStream {
 
                 // Create new identifiers for the Generics
                 let generic_params = idents.iter().map(|id| {
-                    format_ident!("T{}", id.as_ref().unwrap())
+                    format_ident!("{}", ccase!(camel,id.as_ref().unwrap().to_string()))
                 }).collect::<Vec<_>>();
                 
                 quote! {
