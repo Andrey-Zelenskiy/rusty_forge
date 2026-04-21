@@ -1,0 +1,29 @@
+[package]
+name = "forge-manager"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Tools to setup and simulation projects. Part of rusty_forge."
+
+[dependencies]
+chrono.workspace = true
+config.workplace = true
+rayon.workspace = true
+regex.workspace = true
+serde.workplace = true
+sysinfo.workspace = true
+temfile.workspace = true
+toml.workspace = true
+
+forge-derive.workspace = true
+forge-builder.workspace = true
+
+[lints]
+workspace = true
+

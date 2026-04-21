@@ -1,0 +1,23 @@
+[package]
+name = "forge-builder"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Tools to initialize data from input parameters following Builder pattern. Part of rusty_forge."
+
+[dependencies]
+config.workplace = true
+rand.workplace = true
+rand_distr.workplace = true
+serde.workplace = true
+
+forge-derive.workspace = true
+
+[lints]
+workspace = true

@@ -1,16 +1,35 @@
+[workspace]
+resolver = "3"
+members = [
+  "forge-derive",
+  "forge-builder",
+  "forge-manager",
+]
+default-members = [
+  "forge-derive",
+  "forge-builder",
+  "forge-manager",
+]
+
 [package]
 name = "rusty_forge"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+rust-verison = "1.91"
+repository = "https://codeberg.org/azelenskiy/rusty_forge.git"
 description = "General-purpose library of utility methods for numerical simulations."
-license = "BSD-3"
-repository = ""
+license = "BSD-3-Clause"
 readme = "README.md"
-keywords = ["numerical simulations", "utilities"]
+keywords = ["simulation", "utilities"]
 categorier = ["filesystem", "science", "development-tools::build-utils"]
 
-[dependencies]
-builder_derive = { path = "./builder_derive" }
+[workspace.dependencies]
+# rusty_forge crates
+forge-derive = { path = "./forge-derive" }
+forge-builder = { path = "./forge-builder" }
+forge-manager = { path = "./forge-manager" }
+
+# Internal dependencies
 chrono = { version = "0.4", features = [ "serde" ] }
 config = "0.15"
 serde_json = "1.0"
@@ -22,3 +41,12 @@ serde = { version = "1.0.147", features = [ "derive" ] }
 sysinfo = "0.38"
 tempfile = "3.26"
 toml = "0.8"
+
+[workplace.lints.rust]
+missing_docs = "warn"
+
+[workplace.lints.clippy]
+cargo = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+
+needless_pass_by_ref_mut = "warn"
