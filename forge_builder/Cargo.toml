@@ -1,8 +1,8 @@
 [package]
-name = "forge-derive"
+name = "forge-builder"
 authors.workspace = true
 categories.workspace = true
-description = "Derive macros for rusty_forge"
+description = "Tools to initialize data from input parameters following Builder pattern. Part of rusty_forge."
 edition.workspace = true
 keywords.workspace = true
 license.workspace = true
@@ -12,13 +12,12 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-convert_case.workspace = true
-proc-macro2.workspace = true
-quote.workspace = true
-syn.workspace = true
+config.workplace = true
+rand.workplace = true
+rand_distr.workplace = true
+serde.workplace = true
 
-[lib]
-proc-macro = true
+forge-derive.workspace = true
 
 [lints]
 workspace = true

@@ -19,7 +19,7 @@
 //! Builder and Target types.
 //!
 //! ```rust
-//! use forge_builder::prelude::*;
+//! use rusty_forge::builder::prelude::*;
 //!
 //! // Define the target structure
 //! pub struct MyStruct {
@@ -92,14 +92,14 @@
 //!
 //! ## [BuilderSetter](builder_derive/derive.BuilderSetters.html) derive macro
 //!
-//! To eliminate boilerplate, [forge-derive] module implements
+//! To eliminate boilerplate, [builder](rusty_forge/builder) module implements
 //! a derive macro for automatic definition of setters for both Structs and
 //! Enums.
 //! The `impl MyStructBuilder` block in the example above can be removed by
 //! adding a new derive trait:
 //!
 //! ```rust,ignore
-//! use forge_builder::prelude::*;
+//! use rusty_forge::builder::prelude::*;
 //!
 //! // Define the target structure
 //! pub struct MyStruct {
@@ -123,7 +123,7 @@
 //! field type:
 //!
 //! ```rust
-//! use forge_builder::prelude::*;
+//! use rusty_forge::builder::prelude::*;
 //!
 //! #[derive(BuilderSetters)]
 //! struct Builder {
@@ -152,7 +152,7 @@
 //! we can indicate it by a special attribute:
 //!
 //! ```rust
-//! use forge_builder::prelude::*;
+//! use rusty_forge::builder::prelude::*;
 //!
 //! #[derive(BuilderSetters, Default)]
 //! struct Complex {
@@ -178,7 +178,7 @@
 //! This trait works also on Enums:
 //!
 //! ```rust
-//! use forge_builder::prelude::*;
+//! use rusty_forge::builder::prelude::*;
 //!
 //! // Enum representing initialization options of a float scalar
 //! #[derive(BuilderSetters, Default)]
@@ -210,7 +210,7 @@
 //! automatically define a corresponding builder structure:
 //!
 //! ```rust
-//! use forge_builder::prelude::*;
+//! use rusty_forge::builder::prelude::*;
 //!
 //! use std::path::PathBuf;
 //!
@@ -291,6 +291,11 @@ use std::{error::Error, fmt, path::PathBuf};
 use config::{Config, ConfigError};
 
 use serde::{Deserialize, Serialize};
+
+pub mod prelude {
+    pub use super::{BuildError, BuilderMethods, TargetFromBuilder};
+    pub use builder_derive::{BuilderFromTargets, BuilderSetters};
+}
 
 /// Trait for argument structure with required initialization function
 pub trait BuilderMethods:
@@ -481,7 +486,7 @@ impl_builder_for_sized_arrays!(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use forge_derive::{BuilderFromTargets, BuilderSetters};
+    use builder_derive::{BuilderFromTargets, BuilderSetters};
     use serde::Deserialize;
 
     pub struct TargetExplicit {

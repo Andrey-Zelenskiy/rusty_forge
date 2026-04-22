@@ -25,10 +25,7 @@ use syn::{
     GenericArgument, PathArguments, Type,
 };
 
-/// Derive methods for Builders to set field values without boilerplate
-///
-/// # Panics
-/// This function panics when it is applied to data structures other than structs or enums.
+// Derive methods for Builders to set field values without boilerplate
 #[proc_macro_derive(BuilderSetters, attributes(setter))]
 pub fn derive_setters(input: TokenStream) -> TokenStream {
     // Get information about the type
@@ -60,7 +57,7 @@ fn generate_struct_setters(data: &DataStruct) -> proc_macro2::TokenStream {
     };
 
     let setters = fields.iter().map(|f| {
-        let field_name = f.ident.as_ref().expect("Failed to extract the name of the structure.");
+        let field_name = f.ident.as_ref().unwrap();
         let field_ty = &f.ty;
         let setter_name = format_ident!("set_{}", field_name);
 
@@ -142,13 +139,7 @@ fn generate_enum_setters(data: &DataEnum) -> proc_macro2::TokenStream {
 
                 // Create new identifiers for the Generics
                 let generic_params = idents.iter().map(|id| {
-                    format_ident!(
-                        "{}",
-                        ccase!(
-                            camel,
-                            id.as_ref()
-                            .expect("Failed to extract the name of the enum argument identifier")
-                            .to_string()))
+                    format_ident!("{}", ccase!(camel,id.as_ref().unwrap().to_string()))
                 }).collect::<Vec<_>>();
                 
                 quote! {
@@ -168,16 +159,19 @@ fn generate_enum_setters(data: &DataEnum) -> proc_macro2::TokenStream {
 fn get_option_inner_type(ty: &Type) -> Option<&Type> {
     if let Type::Path(tp) = ty {
         let last_segment = tp.path.segments.last()?;
-        if last_segment.ident == "Option"
-            && let PathArguments::AngleBracketed(args) = &last_segment.arguments
-            && let Some(GenericArgument::Type(inner)) = args.args.first() {
-                return Some(inner);
+        if last_segment.ident == "Option" {
+            if let PathArguments::AngleBracketed(args) = &last_segment.arguments
+            {
+                if let Some(GenericArgument::Type(inner)) = args.args.first() {
+                    return Some(inner);
+                }
+            }
         }
     }
     None
 }
 
-/// Derive for structs consisting of types that implement TargetFromBuilder
+// Derive for structs consisting of types that implement TargetFromBuilder
 #[proc_macro_derive(BuilderFromTargets, attributes(builder))]
 pub fn derive_builder_from_targets(input: TokenStream) -> TokenStream {
     // Get information about the structure

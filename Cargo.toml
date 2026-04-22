@@ -1,52 +1,55 @@
 [workspace]
 resolver = "3"
 members = [
-  "forge-derive",
-  "forge-builder",
-  "forge-manager",
-]
-default-members = [
-  "forge-derive",
-  "forge-builder",
-  "forge-manager",
-]
+           "forge-derive",
+           "forge-builder",
+           "forge-manager"
+          ]
 
-[package]
-name = "rusty_forge"
-version = "0.1.0"
-edition = "2024"
-rust-verison = "1.91"
-repository = "https://codeberg.org/azelenskiy/rusty_forge.git"
+default-members = [
+           "forge-derive",
+           "forge-builder",
+           "forge-manager"
+          ] 
+
+[workspace.package]
+authors = ["Andrey Zelenskiy"]
+categories = ["filesystem", "science", "development-tools::build-utils"]
 description = "General-purpose library of utility methods for numerical simulations."
-license = "BSD-3-Clause"
-readme = "README.md"
+edition = "2024"
 keywords = ["simulation", "utilities"]
-categorier = ["filesystem", "science", "development-tools::build-utils"]
+license = "BSD 3-Clause License"
+readme = "README.md"
+repository = "https://codeberg.org/azelenskiy/rusty_forge.git"
+rust-version = "1.91"
+version = "0.1.0"
 
 [workspace.dependencies]
 # rusty_forge crates
-forge-derive = { path = "./forge-derive" }
-forge-builder = { path = "./forge-builder" }
-forge-manager = { path = "./forge-manager" }
+forge-derive = { path = "forge-derive" }
+forge-builder = { path = "forge-builder" }
+forge-manager = { path = "forge-manager" }
 
 # Internal dependencies
 chrono = { version = "0.4", features = [ "serde" ] }
 config = "0.15"
-serde_json = "1.0"
+convert_case = "0.11"
+proc-macro2 = "1.0"
+quote = "1.0"
 rand = "0.9"
 rand_distr = "0.5"
 rayon = "1.11"
 regex = "1.12"
 serde = { version = "1.0.147", features = [ "derive" ] }
+syn = { version = "2.0", features = ["full"] }
 sysinfo = "0.38"
 tempfile = "3.26"
 toml = "0.8"
 
-[workplace.lints.rust]
-missing_docs = "warn"
-
-[workplace.lints.clippy]
+[workspace.lints.clippy]
 cargo = { level = "warn", priority = -1 }
-pedantic = { level = "warn", priority = -1 }
 
+missing_docs_in_public_items = "warn"
 needless_pass_by_ref_mut = "warn"
+todo = "warn"
+unwrap_used = "warn"
