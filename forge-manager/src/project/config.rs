@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use sysinfo::System;
 
-use crate::{errors::SimulationError, ManagerResult};
+use crate::{errors::ManagerError, ManagerResult};
 
 pub const CURRENT_SCHEMA_VERSION: u32 = 0;
 
@@ -96,13 +96,11 @@ impl ProjectManifest {
                 // Before deserializing, check that the schema_version matches
                 // CURRENT_SCHEMA_VERSION value
                 let schema = config.get("schema_version").map_err(|_| {
-                    SimulationError::SchemaNotFound(PathBuf::from(
-                        &manifest_path,
-                    ))
+                    ManagerError::SchemaNotFound(PathBuf::from(&manifest_path))
                 })?;
 
                 if schema != CURRENT_SCHEMA_VERSION {
-                    Err(SimulationError::SchemaMismatch {
+                    Err(ManagerError::SchemaMismatch {
                         path: PathBuf::from(&manifest_path),
                         manifest_schema: schema,
                         current_schema: CURRENT_SCHEMA_VERSION,

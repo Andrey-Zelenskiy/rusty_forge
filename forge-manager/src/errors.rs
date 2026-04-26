@@ -6,7 +6,7 @@ use thiserror::Error;
 
 /// Errors that occur during initialization and execution of simulations
 #[derive(Error, Debug)]
-pub enum SimulationError {
+pub enum ManagerError {
     #[error("Error in the IO operation: {0}")]
     Io(#[from] std::io::Error),
     #[error("Serialization failed: {0}")]
@@ -29,4 +29,22 @@ pub enum SimulationError {
     ProjectAlreadyExists(PathBuf),
     #[error("Cannot find project directory at {0}")]
     ProjectNotFound(PathBuf),
+}
+
+/// Errors that occur during initialization of model parameters
+#[derive(Error, Debug)]
+pub enum ParameterError {
+    #[error("Serialization failed: {0}")]
+    Serialization(#[from] toml::ser::Error),
+    #[error("Missing required key {0} during parameter initialization")]
+    MissingKey(String),
+    #[error(
+        "Incorrect value type during initialization of {name}: \
+        expected {expected}, got {current}"
+    )]
+    IncorrectValueType {
+        name: String,
+        expected: String,
+        current: String,
+    },
 }
