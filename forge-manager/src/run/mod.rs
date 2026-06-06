@@ -1,76 +1,155 @@
 // Copyright Andrey Zelenskiy, 2024-2026
 
-use std::fmt;
+use std::{fmt, path::PathBuf};
 
 use chrono::{DateTime, Utc};
 
-use rand::random;
+use serde::{Deserialize, Serialize};
+
+use crate::run::parameters::ParameterMap;
 
 pub mod parameters;
 
-pub struct Run {}
-
-/// ID of a simulation run
-pub struct RunID {
-    /// Timestamp
-    timestamp: String,
-    /// Additional suffix (in case of multiple consequtive runs)
-    suffix: Option<String>,
+/// Manager for a single simulation run
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Run {
+    /// ID of the simulation run
+    pub id: RunId,
+    /// Config for simulation parameters
+    pub parameters: ParameterMap,
+    /// Current status of the simulation
+    pub status: RunStatus,
+    /// Timestamp of run initialization
+    pub initialization_time: DateTime<Utc>,
+    /// Output directory for the simulation
+    pub run_dir: PathBuf,
 }
 
-impl RunID {
-    /// Generate new RunID with no suffix
+impl Run {
+    /// Initialize a new simulation run
+    pub fn new(id: RunId, parameters: ParameterMap, run_dir: PathBuf) -> Self {
+        Self {
+            id,
+            parameters,
+            status: RunStatus::Pending,
+            initialization_time: Utc::now(),
+            run_dir,
+        }
+    }
+}
+
+/// ID of a simulation run
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
+pub struct RunId {
+    /// Timestamp
+    timestamp: DateTime<Utc>,
+    /// Additional suffix (in case of multiple consequtive runs)
+    suffix: Option<Suffix>,
+}
+
+impl RunId {
+    /// Generate new RunId with random suffix
+    pub fn from_random() -> Self {
+        Self {
+            timestamp: Utc::now(),
+            suffix: Some(Suffix::Random(rand::random())),
+        }
+    }
+
+    /// Generate new RunId with no suffix
     pub fn from_timestamp() -> Self {
         Self {
-            timestamp: Utc::now().format("%Y-%m-%d").to_string(),
+            timestamp: Utc::now(),
             suffix: None,
         }
     }
 
-    /// Generate new RunID with random suffix
-    pub fn from_random() -> Self {
+    /// Generate new RunId from timestamp with parameter hash suffix
+    pub fn from_parameters(params: &ParameterMap) -> Self {
         Self {
-            timestamp: Utc::now().format("%Y-%m-%d").to_string(),
-            suffix: Some(format!("{:08x}", random::<u32>())),
+            timestamp: Utc::now(),
+            suffix: Some(Suffix::Hash(format!("{:08x}", params.hash()))),
         }
     }
 
-    /// Generate new RunID with a single numerical index
+    /// Generate new RunId with a single numerical index
     pub fn from_index(index: u32) -> Self {
         Self {
-            timestamp: Utc::now().format("%Y-%m-%d").to_string(),
-            suffix: Some(format!("{:04}", index)),
+            timestamp: Utc::now(),
+            suffix: Some(Suffix::Index(index)),
         }
     }
 
-    /// Generate new RunID with a pair of numerical indices
-    pub fn from_index_pair(index1: u32, index2: u32) -> Self {
+    /// Generate new RunId with a pair of numerical indices
+    pub fn from_index_set(indices: Vec<u32>) -> Self {
         Self {
-            timestamp: Utc::now().format("%Y-%m-%d").to_string(),
-            suffix: Some(format!("{:04}_{:04}", index1, index2)),
+            timestamp: Utc::now(),
+            suffix: Some(Suffix::IndexSet(indices)),
         }
     }
 }
 
-impl fmt::Display for RunID {
+impl fmt::Display for RunId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let ts = self.timestamp.format("%Y-%m-%d").to_string();
         match &self.suffix {
-            Some(s) => write!(f, "{}_{}", self.timestamp, s),
+            Some(s) => match s {
+                Suffix::Random(r) => write!(f, "{}_{:08x}", ts, r),
+                Suffix::Hash(h) => write!(f, "{}_param_{}", ts, h),
+                Suffix::Index(i) => write!(f, "{}_{}", ts, i),
+                Suffix::IndexSet(i_set) => {
+                    write!(
+                        f,
+                        "{}_{}",
+                        ts,
+                        i_set
+                            .iter()
+                            .map(|i| i.to_string())
+                            .collect::<Vec<String>>()
+                            .join("_")
+                    )
+                }
+            },
             None => write!(f, "{}", self.timestamp),
         }
     }
 }
 
+/// Options for a suffix
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
+#[serde(untagged)]
+pub enum Suffix {
+    /// Random suffix
+    #[serde(rename = "random")]
+    Random(u32),
+    // First 8 hex chars of parameter hash
+    #[serde(rename = "hash")]
+    Hash(String),
+    #[serde(rename = "index")]
+    Index(u32),
+    #[serde(rename = "index_set")]
+    IndexSet(Vec<u32>),
+}
+
 /// Status state of a simulation run
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "status")]
 pub enum RunStatus {
     /// Run is scheduled, but has not been started by the scheduler yet
+    #[serde(rename = "pending")]
     Pending,
     /// Run has been started, and hasn't terminated yet
+    #[serde(rename = "running")]
     Running {
         /// Initialization time of the simulation run
         start_time: DateTime<Utc>,
     },
     /// Run has been completed successfully
+    #[serde(rename = "completed")]
     Completed {
         /// Initialization time of the simulation run
         start_time: DateTime<Utc>,
@@ -79,6 +158,7 @@ pub enum RunStatus {
     },
     /// Run was ended before the completion of the simulation
     /// (likely due to error)
+    #[serde(rename = "failed")]
     Failed {
         /// Initialization time of the simulation run
         start_time: DateTime<Utc>,
@@ -87,4 +167,76 @@ pub enum RunStatus {
         /// Reason for preliminary termination of the run
         reason: String,
     },
+}
+
+impl RunStatus {
+    /// Checks if the run is terminated
+    pub fn is_terminated(&self) -> bool {
+        matches!(self, Self::Completed { .. } | Self::Failed { .. })
+    }
+
+    /// Checks if the simulation is running
+    pub fn is_running(&self) -> bool {
+        matches!(self, Self::Running { .. })
+    }
+
+    /// Validates state transition
+    pub fn can_transition_to(&self, next: &RunStatus) -> bool {
+        match (self, next) {
+            (Self::Pending, Self::Running { .. }) => true,
+            (Self::Running { .. }, Self::Completed { .. }) => true,
+            (Self::Running { .. }, Self::Failed { .. }) => true,
+            (Self::Failed { .. }, Self::Pending) => true,
+            _ => false,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_run_status_transitions() {
+        let pending = RunStatus::Pending;
+        let running = RunStatus::Running {
+            start_time: Utc::now(),
+        };
+        let completed = RunStatus::Completed {
+            start_time: Utc::now(),
+            end_time: Utc::now(),
+        };
+
+        assert!(!pending.can_transition_to(&pending));
+        assert!(pending.can_transition_to(&running));
+        assert!(!pending.can_transition_to(&completed));
+
+        assert!(!running.can_transition_to(&pending));
+        assert!(!running.can_transition_to(&running));
+        assert!(running.can_transition_to(&completed));
+
+        assert!(!completed.can_transition_to(&pending));
+        assert!(!completed.can_transition_to(&running));
+        assert!(!completed.can_transition_to(&completed));
+    }
+
+    #[test]
+    fn test_is_terminated() {
+        assert!(!RunStatus::Pending.is_terminated());
+        assert!(!RunStatus::Running {
+            start_time: Utc::now()
+        }
+        .is_terminated());
+        assert!(RunStatus::Completed {
+            start_time: Utc::now(),
+            end_time: Utc::now()
+        }
+        .is_terminated());
+        assert!(RunStatus::Failed {
+            start_time: Utc::now(),
+            end_time: Utc::now(),
+            reason: "none".to_string()
+        }
+        .is_terminated());
+    }
 }

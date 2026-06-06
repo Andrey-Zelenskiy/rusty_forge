@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::ParameterResult;
 
 /// Model parameters with stringified keys
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParameterMap(HashMap<String, ParameterValue>);
 
 impl ParameterMap {
