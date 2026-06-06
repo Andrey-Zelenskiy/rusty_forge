@@ -2,7 +2,7 @@
 
 use std::{fs::create_dir_all, path::PathBuf};
 
-use crate::{errors::SimulationError, ManagerResult};
+use crate::{errors::ManagerError, ManagerResult};
 
 #[derive(Debug)]
 pub struct ProjectLayout(PathBuf);
@@ -56,7 +56,7 @@ impl ProjectLayout {
     /// Initialize project layout
     pub fn create_layout(&self) -> ManagerResult<()> {
         if self.root_dir().exists() {
-            Err(SimulationError::ProjectAlreadyExists(PathBuf::from(
+            Err(ManagerError::ProjectAlreadyExists(PathBuf::from(
                 self.root_dir(),
             )))
         } else {

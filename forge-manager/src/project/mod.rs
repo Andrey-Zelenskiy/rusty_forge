@@ -14,10 +14,10 @@ use std::path::{Path, PathBuf};
 
 use config::ProjectManifest;
 
-mod layout;
+pub mod layout;
 use layout::ProjectLayout;
 
-use crate::{errors::SimulationError, ManagerResult};
+use crate::{errors::ManagerError, ManagerResult};
 
 /// Structure that manages the simulation project
 pub struct ProjectManager {
@@ -29,6 +29,19 @@ pub struct ProjectManager {
 
 impl ProjectManager {
     /// Creates a new simulation project
+    ///
+    /// The resulting layout for project with path `project_root` is
+    ///
+    /// ``` ignore
+    /// project_root/
+    /// |     index.toml       # Index of the simulation runs
+    /// |     manifest.toml    # Project manifest file
+    /// |     registry.toml    # Simulation run registry
+    /// |
+    /// +---- analysis/        # Directory for simulation data analysis
+    /// |
+    /// +---- runs/            # Directory with all simulation runs
+    /// ```
     pub fn create(
         name: &str,
         author: Option<&str>,
@@ -36,7 +49,7 @@ impl ProjectManager {
         path: &Path,
     ) -> ManagerResult<Self> {
         if Self::exists(path) {
-            Err(SimulationError::ProjectAlreadyExists(PathBuf::from(path)))
+            Err(ManagerError::ProjectAlreadyExists(PathBuf::from(path)))
         } else {
             // Create a new project manager
             let manager = Self {
@@ -62,7 +75,7 @@ impl ProjectManager {
                 layout: ProjectLayout::new(PathBuf::from(path)),
             })
         } else {
-            Err(SimulationError::ProjectNotFound(PathBuf::from(path)))
+            Err(ManagerError::ProjectNotFound(PathBuf::from(path)))
         }
     }
 
@@ -482,7 +495,7 @@ mod tests {
 
         assert!(
             ProjectManager::create("test", None, None, &path).is_err_and(|e| {
-                if let SimulationError::ProjectAlreadyExists(p) = e {
+                if let ManagerError::ProjectAlreadyExists(p) = e {
                     p == path
                 } else {
                     false
@@ -505,7 +518,7 @@ mod tests {
 
         assert!(
             result.is_err_and(|e| {
-                if let SimulationError::ProjectNotFound(p) = e {
+                if let ManagerError::ProjectNotFound(p) = e {
                     p == path
                 } else {
                     false
@@ -536,7 +549,7 @@ mod tests {
             .expect("Failed to overwrite manifest.toml");
 
         assert!(ProjectManager::load(&path).is_err_and(|e| {
-            if let SimulationError::SchemaMismatch {
+            if let ManagerError::SchemaMismatch {
                 path,
                 manifest_schema,
                 current_schema,
