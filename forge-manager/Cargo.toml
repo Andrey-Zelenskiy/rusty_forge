@@ -14,6 +14,7 @@ version.workspace = true
 
 [dependencies]
 chrono.workspace = true
+clap.workspace = true
 config.workspace = true
 rand.workspace = true
 rayon.workspace = true
@@ -30,3 +31,6 @@ forge-builder.workspace = true
 [lints]
 workspace = true
 
+[[bin]]
+name = "forge_project"
+path = "src/bin/forge_project.rs"

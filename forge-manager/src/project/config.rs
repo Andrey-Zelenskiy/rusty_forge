@@ -23,7 +23,7 @@ pub const CURRENT_SCHEMA_VERSION: u32 = 0;
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct ProjectManifest {
     // Project-specific metadata
-    metadata: ProjectMeta,
+    pub(super) metadata: ProjectMeta,
     // Environment-specific metadata
     environment: EnvironmentMeta,
     // Schema/version of project manifest
@@ -35,8 +35,8 @@ impl ProjectManifest {
     /// Initializes a manifest data for a new project
     pub fn new(
         name: &str,
-        author: Option<&str>,
-        description: Option<&str>,
+        author: &Option<String>,
+        description: &Option<String>,
     ) -> Self {
         let mut sys = System::new_all();
 
@@ -45,8 +45,8 @@ impl ProjectManifest {
         Self {
             metadata: ProjectMeta {
                 name: String::from(name),
-                author: author.map(String::from),
-                description: description.map(String::from),
+                author: author.clone(),
+                description: description.clone(),
                 start_time: Utc::now(),
                 end_time: None,
                 duration: None,
@@ -128,15 +128,15 @@ impl ProjectManifest {
 
 /// State of the program at the start of the run
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
-struct ProjectMeta {
+pub(super) struct ProjectMeta {
     // Project name
-    name: String,
+    pub(super) name: String,
     // Project author
-    author: Option<String>,
+    pub(super) author: Option<String>,
     // Project description
-    description: Option<String>,
+    pub(super) description: Option<String>,
     // Initialization time of the simulation project
-    start_time: DateTime<Utc>,
+    pub(super) start_time: DateTime<Utc>,
     // Completion time of the simulation project
     end_time: Option<DateTime<Utc>>,
     // Duration of the program from initialization to completion

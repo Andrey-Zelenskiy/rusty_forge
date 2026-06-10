@@ -38,6 +38,26 @@ impl Run {
     }
 }
 
+/// Information that gets serialized by the Registry
+pub struct RunState {
+    /// ID of the simulation run
+    pub id: RunId,
+    /// Current status of the simulation
+    pub status: RunStatus,
+    /// Timestamp of run initialization
+    pub initialization_time: DateTime<Utc>,
+}
+
+impl From<&Run> for RunState {
+    fn from(value: &Run) -> Self {
+        Self {
+            id: value.id.clone(),
+            status: value.status.clone(),
+            initialization_time: value.initialization_time,
+        }
+    }
+}
+
 /// ID of a simulation run
 #[derive(
     Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
@@ -182,13 +202,13 @@ impl RunStatus {
 
     /// Validates state transition
     pub fn can_transition_to(&self, next: &RunStatus) -> bool {
-        match (self, next) {
-            (Self::Pending, Self::Running { .. }) => true,
-            (Self::Running { .. }, Self::Completed { .. }) => true,
-            (Self::Running { .. }, Self::Failed { .. }) => true,
-            (Self::Failed { .. }, Self::Pending) => true,
-            _ => false,
-        }
+        matches!(
+            (self, next),
+            (Self::Pending, Self::Running { .. })
+                | (Self::Running { .. }, Self::Completed { .. })
+                | (Self::Running { .. }, Self::Failed { .. })
+                | (Self::Failed { .. }, Self::Pending)
+        )
     }
 }
 

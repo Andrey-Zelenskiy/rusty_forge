@@ -44,8 +44,8 @@ impl ProjectManager {
     /// ```
     pub fn create(
         name: &str,
-        author: Option<&str>,
-        description: Option<&str>,
+        author: &Option<String>,
+        description: &Option<String>,
         path: &Path,
     ) -> ManagerResult<Self> {
         if Self::exists(path) {
@@ -82,6 +82,26 @@ impl ProjectManager {
     /// Checks if a project is initialized at a given path
     pub fn exists(path: &Path) -> bool {
         path.with_file_name("manifest.toml").exists()
+    }
+
+    /// Project name
+    pub fn name(&self) -> &str {
+        &self.manifest.metadata.name
+    }
+
+    /// Project path
+    pub fn path(&self) -> &Path {
+        self.layout.root_dir()
+    }
+
+    /// Project author (if given)
+    pub fn author(&self) -> &Option<String> {
+        &self.manifest.metadata.author
+    }
+
+    /// Project description (if given)
+    pub fn description(&self) -> &Option<String> {
+        &self.manifest.metadata.description
     }
 }
 
@@ -436,7 +456,7 @@ mod tests {
             .join("project");
 
         assert!(
-            ProjectManager::create("test", None, None, &path).is_ok(),
+            ProjectManager::create("test", &None, &None, &path).is_ok(),
             "Failed to initialize a simple project directory"
         );
 
@@ -467,7 +487,7 @@ mod tests {
             .path()
             .join("project");
 
-        let manager = ProjectManager::create("test", None, None, &path)
+        let manager = ProjectManager::create("test", &None, &None, &path)
             .expect("Failed to initialize a simple project directory");
 
         let manager_load = ProjectManager::load(&path)
@@ -489,18 +509,20 @@ mod tests {
             .join("project");
 
         assert!(
-            ProjectManager::create("test", None, None, &path).is_ok(),
+            ProjectManager::create("test", &None, &None, &path).is_ok(),
             "Failed to initialize a test project"
         );
 
         assert!(
-            ProjectManager::create("test", None, None, &path).is_err_and(|e| {
-                if let ManagerError::ProjectAlreadyExists(p) = e {
-                    p == path
-                } else {
-                    false
+            ProjectManager::create("test", &None, &None, &path).is_err_and(
+                |e| {
+                    if let ManagerError::ProjectAlreadyExists(p) = e {
+                        p == path
+                    } else {
+                        false
+                    }
                 }
-            }),
+            ),
             "Unexpected second initialization of existing project"
         );
     }
@@ -537,7 +559,7 @@ mod tests {
             .path()
             .join("project");
 
-        let mut manager = ProjectManager::create("test", None, None, &path)
+        let mut manager = ProjectManager::create("test", &None, &None, &path)
             .expect("Failed to initialize a simple project directory");
 
         manager.manifest.schema_version += 1;

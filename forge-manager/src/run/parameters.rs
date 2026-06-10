@@ -60,7 +60,9 @@ impl ParameterMap {
 
     /// Create a hash of the parameter set
     pub fn hash(&self) -> u64 {
-        let pairs: Vec<_> = self.iter().collect();
+        let mut pairs: Vec<_> = self.iter().collect();
+
+        pairs.sort_by_key(|(k, _)| k.as_str());
 
         let mut hasher = DefaultHasher::new();
         for (key, value) in pairs {
@@ -102,6 +104,12 @@ impl ParameterMap {
             only_in_right,
             changed,
         }
+    }
+}
+
+impl Default for ParameterMap {
+    fn default() -> Self {
+        ParameterMap::new()
     }
 }
 
@@ -201,7 +209,11 @@ mod tests {
         map2.insert("b".to_string(), 2.0.into());
         map2.insert("a".to_string(), 1.0.into());
 
-        assert_eq!(map1.hash(), map2.hash());
+        assert_eq!(
+            map1.hash(),
+            map2.hash(),
+            "Hash of map1 ({map1:?}) and map 2 ({map2:?}) is not the same"
+        );
     }
 
     // Test difference detection for two sets of parameters
