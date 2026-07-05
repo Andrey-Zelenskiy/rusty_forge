@@ -8,16 +8,17 @@
 //! with existing data.
 //!
 //! ## Example
-
-mod config;
 use std::path::{Path, PathBuf};
 
+use crate::{errors::ManagerError, ManagerResult};
+
+pub(crate) mod config;
 use config::ProjectManifest;
 
-pub mod layout;
+pub(crate) mod layout;
 use layout::ProjectLayout;
 
-use crate::{errors::ManagerError, ManagerResult};
+pub(crate) mod build_methods;
 
 /// Structure that manages the simulation project
 pub struct ProjectManager {
