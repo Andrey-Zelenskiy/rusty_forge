@@ -13,7 +13,7 @@ default-members = [
           ] 
 
 [workspace.package]
-authors = ["Andrey Zelenskiy"]
+authors = ["Andrey Zelenskiy, <azelenskiy@proton.me>"]
 categories = ["filesystem", "science", "development-tools::build-utils"]
 description = "General-purpose library of utility methods for numerical simulations."
 edition = "2024"
