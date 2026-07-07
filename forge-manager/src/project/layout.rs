@@ -2,7 +2,7 @@
 
 use std::{fs::create_dir_all, path::PathBuf};
 
-use crate::{errors::ManagerError, ManagerResult};
+use crate::{errors::ManagerError, run::RunId, ManagerResult};
 
 #[derive(Debug)]
 pub struct ProjectLayout(PathBuf);
@@ -16,17 +16,17 @@ impl ProjectLayout {
     // File paths
     /// Project manifest file path
     pub fn manifest_file(&self) -> PathBuf {
-        self.0.join("manifest.toml")
+        self.0.with_file_name("manifest.toml")
     }
 
     /// Simulation run registry file path
     pub fn registry_file(&self) -> PathBuf {
-        self.0.join("registry.toml")
+        self.0.with_file_name("registry.toml")
     }
 
     /// Simulation run index file path
     pub fn index_file(&self) -> PathBuf {
-        self.0.join("index.toml")
+        self.0.with_file_name("index.toml")
     }
 
     // Directory paths
@@ -42,9 +42,9 @@ impl ProjectLayout {
     }
 
     /// Path to specific simulation run
-    // pub fn run_dir(&self, run_id: &RunID) -> PathBuf {
-    //     self.0.join("runs/{run_id}")
-    // }
+    pub fn run_dir(&self, run_id: &RunId) -> PathBuf {
+        self.0.join(format!("runs/{run_id}"))
+    }
 
     /// Path to the directory with analysis tools
     pub fn analysis_dir(&self) -> PathBuf {
