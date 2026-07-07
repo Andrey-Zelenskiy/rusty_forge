@@ -4,29 +4,13 @@ use std::{fs::create_dir_all, path::PathBuf};
 
 use crate::{errors::ManagerError, run::RunId, ManagerResult};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ProjectLayout(PathBuf);
 
 impl ProjectLayout {
     /// Create a new layout manager from project root
     pub fn new(path: PathBuf) -> Self {
         Self(path)
-    }
-
-    // File paths
-    /// Project manifest file path
-    pub fn manifest_file(&self) -> PathBuf {
-        self.0.with_file_name("manifest.toml")
-    }
-
-    /// Simulation run registry file path
-    pub fn registry_file(&self) -> PathBuf {
-        self.0.with_file_name("registry.toml")
-    }
-
-    /// Simulation run index file path
-    pub fn index_file(&self) -> PathBuf {
-        self.0.with_file_name("index.toml")
     }
 
     // Directory paths

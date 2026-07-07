@@ -10,7 +10,12 @@
 //! ## Example
 use std::path::{Path, PathBuf};
 
-use crate::{errors::ManagerError, ManagerResult};
+use crate::{
+    errors::ManagerError,
+    registry::{query::RunFilter, Registry},
+    run::{parameters::ParameterMap, Run, RunId, RunIdBuilder},
+    ManagerResult,
+};
 
 pub(crate) mod config;
 use config::ProjectManifest;
@@ -26,6 +31,8 @@ pub struct ProjectManager {
     manifest: ProjectManifest,
     /// Project path dependencies
     layout: ProjectLayout,
+    /// Simulation run registry
+    registry: Registry,
 }
 
 impl ProjectManager {
@@ -56,6 +63,7 @@ impl ProjectManager {
             let manager = Self {
                 manifest: ProjectManifest::new(name, author, description),
                 layout: ProjectLayout::new(PathBuf::from(path)),
+                registry: Registry,
             };
 
             // Initialize project layout
@@ -74,6 +82,7 @@ impl ProjectManager {
             Ok(Self {
                 manifest: ProjectManifest::load(path)?,
                 layout: ProjectLayout::new(PathBuf::from(path)),
+                registry: Registry,
             })
         } else {
             Err(ManagerError::ProjectNotFound(PathBuf::from(path)))
@@ -103,6 +112,34 @@ impl ProjectManager {
     /// Project description (if given)
     pub fn description(&self) -> &Option<String> {
         &self.manifest.metadata.description
+    }
+
+    /// Registers a simulation run
+    pub fn register_run(
+        &self,
+        id_builder: RunIdBuilder,
+        parameters: &ParameterMap,
+    ) -> ManagerResult<RunId> {
+        self.registry.register(&self.layout, id_builder, parameters)
+    }
+
+    /// Returns simulation run information
+    pub fn get_run(&self, id: &RunId) -> ManagerResult<Run> {
+        self.registry.get(&self.layout, id)
+    }
+
+    /// Returns a list of simulation runs that pass specific criteria
+    pub fn query_runs(&self, filter: &RunFilter) -> ManagerResult<Vec<Run>> {
+        self.registry.query(&self.layout, filter)
+    }
+
+    /// Updates the status of a simulation run
+    pub fn update_run_status(
+        &self,
+        id: &RunId,
+        status_str: &str,
+    ) -> ManagerResult<()> {
+        self.registry.update_status(&self.layout, id, status_str)
     }
 }
 
