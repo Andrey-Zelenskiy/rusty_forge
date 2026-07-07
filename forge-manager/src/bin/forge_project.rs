@@ -12,7 +12,7 @@ fn main() {
             eprintln!("\n Config file parsing failed: {e}\n");
             std::process::exit(1);
         }
-        Ok(mut initializer) => match initializer.build() {
+        Ok(mut builder) => match builder.build() {
             Err(e) => {
                 eprintln!("\n Project directory initialization failed: {e}\n");
                 std::process::exit(1);
