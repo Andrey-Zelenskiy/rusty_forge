@@ -2,13 +2,16 @@
 
 use std::{
     collections::HashMap,
-    fmt,
+    fmt, fs,
     hash::{DefaultHasher, Hash, Hasher},
+    io,
+    path::Path,
 };
 
+use config::{Config, File, FileFormat};
 use serde::{Deserialize, Serialize};
 
-use crate::ParameterResult;
+use crate::{ManagerError, ManagerResult, ParameterResult};
 
 /// Model parameters with stringified keys
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -104,6 +107,37 @@ impl ParameterMap {
             only_in_right,
             changed,
         }
+    }
+
+    // I/O for parameter config
+
+    /// Write config to run directory
+    pub fn write(&self, run_dir: &Path) -> ManagerResult<()> {
+        // Ensure that the directory exists
+        fs::create_dir_all(run_dir)?;
+
+        // Write parameters
+        let parameters_path = run_dir.with_file_name("parameters.toml");
+        let parameters_toml = toml::to_string_pretty(&self)?;
+
+        fs::write(parameters_path, parameters_toml).map_err(|e| e.into())
+    }
+
+    pub fn load(run_dir: &Path) -> ManagerResult<Self> {
+        let parameters_path = run_dir.with_file_name("parameters.toml");
+
+        let parameters_path_str = parameters_path.to_str().ok_or(
+            ManagerError::Io(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Unable to convert run Path to str",
+            )),
+        )?;
+
+        Config::builder()
+            .add_source(File::new(parameters_path_str, FileFormat::Toml))
+            .build()?
+            .try_deserialize::<Self>()
+            .map_err(|e| e.into())
     }
 }
 

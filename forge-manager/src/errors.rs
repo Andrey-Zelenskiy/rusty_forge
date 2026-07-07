@@ -2,6 +2,8 @@
 
 use std::path::PathBuf;
 
+use config::ConfigError;
+use forge_builder::prelude::BuildError;
 use thiserror::Error;
 
 /// Errors that occur during initialization and execution of simulations
@@ -29,6 +31,18 @@ pub enum ManagerError {
     ProjectAlreadyExists(PathBuf),
     #[error("Cannot find project directory at {0}")]
     ProjectNotFound(PathBuf),
+    #[error("Project could not be initialized: {0}")]
+    BuildError(#[from] BuildError),
+    #[error("Error occured in reading the config; {0}")]
+    ConfigError(#[from] ConfigError),
+    #[error("Simulation run {0} not found")]
+    RunNotFound(String),
+    #[error(
+        "Attempted invalid simulation status transition from {from} to {to}"
+    )]
+    InvalidStateTransition { from: String, to: String },
+    #[error("Invalid simulation status: {0}")]
+    InvalidRunStatus(String),
 }
 
 /// Errors that occur during initialization of model parameters
