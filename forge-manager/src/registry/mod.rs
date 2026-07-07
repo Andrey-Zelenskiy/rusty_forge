@@ -1,6 +1,6 @@
 // Copyright Andrey Zelenskiy, 2024-2026
 
-use std::{fs, sync::Arc};
+use std::fs;
 
 pub mod query;
 
@@ -16,24 +16,19 @@ use crate::{
 };
 
 /// Structure that records simulation runs
-pub struct Registry {
-    layout: Arc<ProjectLayout>,
-}
+#[derive(Default)]
+pub struct Registry;
 
 impl Registry {
-    /// Initialize registry from project layout
-    pub fn new(layout: Arc<ProjectLayout>) -> Self {
-        Registry { layout }
-    }
-
     /// Registers a new simulation run
     pub fn register(
         &self,
+        layout: &ProjectLayout,
         builder: RunIdBuilder,
         parameters: &ParameterMap,
     ) -> ManagerResult<RunId> {
         let run_id = builder.build();
-        let run_dir = self.layout.run_dir(&run_id);
+        let run_dir = layout.run_dir(&run_id);
 
         // Create run directory
         fs::create_dir_all(&run_dir)?;
@@ -54,8 +49,8 @@ impl Registry {
     }
 
     /// Returns the manager of a single simulation run
-    pub fn get(&self, id: &RunId) -> ManagerResult<Run> {
-        let run_dir = self.layout.run_dir(id);
+    pub fn get(&self,layout: &ProjectLayout, id: &RunId) -> ManagerResult<Run> {
+        let run_dir = layout.run_dir(id);
 
         if !run_dir.exists() {
             return Err(ManagerError::RunNotFound(id.to_string()));
@@ -74,8 +69,8 @@ impl Registry {
     }
 
     /// List all registered runs
-    pub fn list(&self) -> ManagerResult<Vec<Run>> {
-        let runs_dir = self.layout.runs_dir();
+    pub fn list(&self, layout: &ProjectLayout) -> ManagerResult<Vec<Run>> {
+        let runs_dir = layout.runs_dir();
 
         // Return empty vector if the directory doesn't exist
         if !runs_dir.exists() {
@@ -89,7 +84,7 @@ impl Registry {
             let path = entry.path();
 
             if path.is_dir() && let Ok(state) = RunState::load(&path) {
-                    runs.push(self.get(&state.id)?);
+                    runs.push(self.get(layout, &state.id)?);
             }
         }
 
@@ -97,18 +92,19 @@ impl Registry {
     }
 
     /// List registered runs that fit some filtering criteria
-    pub fn query(&self, filter: &RunFilter) -> ManagerResult<Vec<Run>> {
-        let all_runs = self.list()?;
+    pub fn query(&self, layout: &ProjectLayout, filter: &RunFilter) -> ManagerResult<Vec<Run>> {
+        let all_runs = self.list(layout)?;
         Ok(all_runs.into_iter().filter(|run| filter.matches(run)).collect())
     }
 
     /// Changes the state of the simulation run
     pub fn update_status(
         &self,
+        layout: &ProjectLayout,
         id: &RunId,
         new_status_str: &str,
     ) -> ManagerResult<()> {
-        let run = self.get(id)?;
+        let run = self.get(layout, id)?;
 
         // Validate state transition
         if !run.status.can_transition_to(new_status_str) {
@@ -156,17 +152,17 @@ mod tests {
     fn test_register_and_get() {
         let temp = tempdir()
             .expect("Failed to initialize a temporary directory");
-        let layout = Arc::new(ProjectLayout::new(temp.path().to_path_buf()));
+        let layout = ProjectLayout::new(temp.path().to_path_buf());
         layout.create_layout().expect("Failed to initialize project");
 
-        let registry = Registry::new(layout);
+        let registry = Registry;
 
         let mut params = ParameterMap::new();
         params.insert("x".to_string(), ParameterValue::Float(1.0));
 
-        let run_id = registry.register(RunIdBuilder::Timestamp, &params)
+        let run_id = registry.register(&layout,RunIdBuilder::Timestamp, &params)
             .expect("Failed to register a simulation run");
-        let run = registry.get(&run_id)
+        let run = registry.get(&layout, &run_id)
             .expect("Failed to get a simulation run from its id.");
 
         assert_eq!(run.status, RunStatus::Pending);
@@ -176,28 +172,28 @@ mod tests {
     fn test_status_transitions() {
         let temp = tempdir()
             .expect("Failed to initialize a temporary directory");
-        let layout = Arc::new(ProjectLayout::new(temp.path().to_path_buf()));
+        let layout = ProjectLayout::new(temp.path().to_path_buf());
         layout.create_layout().expect("Failed to initialize project");
         
-        let registry = Registry::new(layout);
+        let registry = Registry;
 
         let params = ParameterMap::new();
-        let run_id = registry.register(RunIdBuilder::Timestamp, &params)
+        let run_id = registry.register(&layout, RunIdBuilder::Timestamp, &params)
             .expect("Failed to register a simulation run");
 
         // Pending -> Running
-        registry.update_status(
+        registry.update_status(&layout, 
             &run_id,
             "Running"
         ).expect("Failed to update status from Pending to Running");
         
         // Running -> Completed
-        registry.update_status(
+        registry.update_status(&layout, 
             &run_id,
             "Completed"
         ).expect("Failed to update status from Pending to Running");
 
-        let run = registry.get(&run_id)
+        let run = registry.get(&layout, &run_id)
             .expect("Failed to recover simulation run.");
 
         assert!(matches!(run.status, RunStatus::Completed {..}));
@@ -207,17 +203,17 @@ mod tests {
     fn test_invalid_transition() {
         let temp = tempdir()
             .expect("Failed to initialize a temporary directory");
-        let layout = Arc::new(ProjectLayout::new(temp.path().to_path_buf()));
+        let layout = ProjectLayout::new(temp.path().to_path_buf());
         layout.create_layout().expect("Failed to initialize project");
         
-        let registry = Registry::new(layout);
+        let registry = Registry;
 
         let params = ParameterMap::new();
-        let run_id = registry.register(RunIdBuilder::Timestamp, &params)
+        let run_id = registry.register(&layout, RunIdBuilder::Timestamp, &params)
             .expect("Failed to register a simulation run");
 
         // Skip to Completed directly (invalid)
-        let result = registry.update_status(&run_id, "Completed");
+        let result = registry.update_status(&layout, &run_id, "Completed");
 
         assert!(result.is_err());        
     }
@@ -226,21 +222,21 @@ mod tests {
     fn test_list_runs() {
         let temp = tempdir()
             .expect("Failed to initialize a temporary directory");
-        let layout = Arc::new(ProjectLayout::new(temp.path().to_path_buf()));
+        let layout = ProjectLayout::new(temp.path().to_path_buf());
         layout.create_layout().expect("Failed to initialize project");
         
-        let registry = Registry::new(layout);
+        let registry = Registry;
 
         let params1 = ParameterMap::new();
         let params2 = ParameterMap::new();
         
-        registry.register(RunIdBuilder::Timestamp, &params1)
+        registry.register(&layout, RunIdBuilder::Timestamp, &params1)
             .expect("Failed to register a simulation run");
 
-        registry.register(RunIdBuilder::Random, &params2)
+        registry.register(&layout, RunIdBuilder::Random, &params2)
             .expect("Failed to register a simulation run");
 
-        let runs = registry.list()
+        let runs = registry.list(&layout, )
             .expect("Failed to return a list of all simulation runs");
 
         assert_eq!(runs.len(), 2);

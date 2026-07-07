@@ -108,8 +108,6 @@ impl RangeFilter {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use chrono::Utc;
     use tempfile::{ tempdir};
 
@@ -188,7 +186,7 @@ mod tests {
 
     #[test]
     fn test_missing_parameter(){
-        let mut params = ParameterMap::new();
+        let params = ParameterMap::new();
         
         let path = tempdir()
             .expect("Failed to initialize a temporary directory.")
