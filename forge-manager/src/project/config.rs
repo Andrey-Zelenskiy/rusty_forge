@@ -71,16 +71,7 @@ impl ProjectManifest {
         let toml_string = toml::to_string_pretty(self)?;
         let manifest_path = path.as_ref().with_file_name("manifest.toml");
 
-        write(&manifest_path, toml_string).map_err(|e| {
-            io::Error::new(
-                io::ErrorKind::PermissionDenied,
-                format!(
-                    "Can't initialize manifest.toml at {:?}: {e}",
-                    &manifest_path
-                ),
-            )
-            .into()
-        })
+        write(&manifest_path, toml_string).map_err(|e| e.into())
     }
 
     /// Extracts manifest data from file if it matches the current schema
