@@ -10,7 +10,7 @@ use chrono::{DateTime, Utc};
 use config::{Config, File, FileFormat};
 use serde::{Deserialize, Serialize};
 
-use crate::{run::parameters::ParameterMap, ManagerError, ManagerResult};
+use crate::{run::parameters::ParameterMap, ManagerResult};
 
 pub mod parameters;
 
@@ -59,23 +59,22 @@ impl RunState {
         let state_path = path.with_file_name("state.toml");
         let state_toml = toml::to_string_pretty(self)?;
 
-        fs::write(state_path, state_toml).map_err(|e| e.into())
+        fs::write(state_path, state_toml).map_err(Into::into)
     }
 
     /// Read state from run directory
     pub fn load(path: &Path) -> ManagerResult<Self> {
         let state_path = path.with_file_name("state.toml");
-        let state_path_str =
-            state_path.to_str().ok_or(ManagerError::Io(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Unable to convert run Path to str",
-            )))?;
+        let state_path_str = state_path.to_str().ok_or(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Unable to convert run Path to str",
+        ))?;
 
         Config::builder()
             .add_source(File::new(state_path_str, FileFormat::Toml))
             .build()?
             .try_deserialize::<Self>()
-            .map_err(|e| e.into())
+            .map_err(Into::into)
     }
 }
 

@@ -11,7 +11,7 @@ use std::{
 use config::{Config, File, FileFormat};
 use serde::{Deserialize, Serialize};
 
-use crate::{ManagerError, ManagerResult, ParameterResult};
+use crate::{ManagerError, ManagerResult};
 
 /// Model parameters with stringified keys
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -120,7 +120,7 @@ impl ParameterMap {
         let parameters_path = run_dir.with_file_name("parameters.toml");
         let parameters_toml = toml::to_string_pretty(&self)?;
 
-        fs::write(parameters_path, parameters_toml).map_err(|e| e.into())
+        fs::write(parameters_path, parameters_toml).map_err(Into::into)
     }
 
     pub fn load(run_dir: &Path) -> ManagerResult<Self> {
@@ -137,7 +137,7 @@ impl ParameterMap {
             .add_source(File::new(parameters_path_str, FileFormat::Toml))
             .build()?
             .try_deserialize::<Self>()
-            .map_err(|e| e.into())
+            .map_err(Into::into)
     }
 }
 
@@ -215,15 +215,6 @@ impl ParameterDiff {
             && self.only_in_right.is_empty()
             && self.changed.is_empty()
     }
-}
-
-/// Trait for manipulating model parameters
-pub trait ModelParameters: Sized {
-    /// Generates ParameterMap with all necessary parameters
-    fn to_map(&self) -> ParameterMap;
-
-    /// Initializes model parameters from ParameterMap
-    fn from_map(map: &ParameterMap) -> ParameterResult<Self>;
 }
 
 #[cfg(test)]
