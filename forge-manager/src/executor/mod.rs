@@ -271,8 +271,10 @@ where
                 .map_err(B::Target::into_err)?;
 
             // Create simulation run directory and register the run
-            let run_id = project_manager
-                .register_run(RunIdBuilder::Random, &parameters)?;
+            let run_id = project_manager.register_run(
+                RunIdBuilder::Parameters(parameters.hash()),
+                &parameters,
+            )?;
 
             // Save a copy of the config at the initialized directory
             self.write(&project_manager.get_run_dir(&run_id))?;
