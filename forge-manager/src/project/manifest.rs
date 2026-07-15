@@ -5,119 +5,148 @@
 //! The metadata is used to store the instance of the system at the time of
 //! the simulation for robust reproducibility of the data, as well as for
 //! tracking the completion status of the simulation runs.
-//!
-//! ## Example
-//!
-//! ```rust
-//! use rusty_forge::project_setup::ProjectManager;
-//! ```
 
-use std::{fs::write, io, path::Path};
+use std::{
+    fs::write,
+    io,
+    path::{Path, PathBuf},
+};
 
-use chrono::{DateTime, TimeDelta, Utc};
+use chrono::{DateTime, Utc};
 
+use config::Config;
 use rayon::current_num_threads;
+
 use serde::{Deserialize, Serialize};
+
 use sysinfo::System;
 
-/// Holds the metadata of the simulation
-#[derive(Deserialize, Serialize, Debug)]
+use crate::{errors::ManagerError, ManagerResult};
+
+pub const CURRENT_SCHEMA_VERSION: u32 = 0;
+
+// Simulation project manifest
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct ProjectManifest {
-    /// State of the program at the start of the run
-    metadata: SimulationMeta,
-    /// Information about hardware architecture
+    // Project-specific metadata
+    pub(super) metadata: ProjectMeta,
+    // Environment-specific metadata
     environment: EnvironmentMeta,
+    // Schema/version of project manifest
+    // (current version is stored in CURRENT_SCHEMA_VERSION)
+    pub(super) schema_version: u32,
+}
+
+impl Default for ProjectManifest {
+    fn default() -> Self {
+        Self {
+            metadata: ProjectMeta::default(),
+            environment: EnvironmentMeta::default(),
+            schema_version: CURRENT_SCHEMA_VERSION,
+        }
+    }
 }
 
 impl ProjectManifest {
-    /// Initialize metadata
-    pub fn new() -> Self {
-        let mut sys = System::new_all();
-
-        sys.refresh_all();
-
+    /// Initializes a manifest data for a new project
+    pub fn new(
+        name: &str,
+        author: &Option<String>,
+        description: &Option<String>,
+    ) -> Self {
         Self {
-            metadata: SimulationMeta {
-                last_checkpoint: None,
+            metadata: ProjectMeta {
+                name: String::from(name),
+                author: author.clone(),
+                description: description.clone(),
                 start_time: Utc::now(),
-                end_time: None,
-                duration: None,
                 git_hash: option_env!("GIT_HASH").map(|s| s.to_string()),
             },
-            environment: EnvironmentMeta {
-                os: System::name().unwrap_or_else(|| "Unknown OS".to_string()),
-                cpu: sys
-                    .cpus()
-                    .first()
-                    .map(|c| c.brand().to_string())
-                    .unwrap_or_else(|| "Unknown CPU".to_string()),
-                threads: current_num_threads(),
-            },
+            environment: EnvironmentMeta::default(),
+            schema_version: CURRENT_SCHEMA_VERSION,
         }
     }
 
-    /// Get timestamp of simulation start as yyyy-mm-dd string
-    pub fn timestamp(&self) -> String {
-        self.metadata.start_time.format("%Y-%m-%d").to_string()
-    }
-
-    /// Return the index of the last checkpoint
-    #[allow(dead_code)]
-    pub fn last_checkpoint(&self) -> &Option<usize> {
-        &self.metadata.last_checkpoint
-    }
-
-    /// Update checpoint index
-    #[allow(dead_code)]
-    pub fn update_checkpoint(&mut self) {
-        match &self.metadata.last_checkpoint {
-            None => self.metadata.last_checkpoint = Some(0),
-            Some(index) => {
-                self.metadata.last_checkpoint = Some(*index + 1);
-            }
-        }
-    }
-
-    /// Check if the program was completed without errors
-    #[allow(dead_code)]
-    pub fn is_completed(&self) -> bool {
-        self.metadata.end_time.is_some()
-    }
-
-    pub fn write<P: AsRef<Path>>(&self, path: P) -> Result<(), io::Error> {
-        let toml_string = toml::to_string_pretty(self)
-            .expect("Failed to convert manifest to toml string.");
+    /// Write manifest data to manifest.toml file
+    pub fn write<P: AsRef<Path>>(&self, path: P) -> ManagerResult<()> {
+        let toml_string = toml::to_string_pretty(self)?;
         let manifest_path = path.as_ref().with_file_name("manifest.toml");
 
-        write(&manifest_path, toml_string).map_err(|e| {
-            io::Error::new(
-                io::ErrorKind::PermissionDenied,
+        write(&manifest_path, toml_string).map_err(Into::into)
+    }
+
+    /// Extracts manifest data from file if it matches the current schema
+    pub fn load<P: AsRef<Path>>(path: P) -> ManagerResult<Self> {
+        // Try to load manifest.toml
+        let manifest_path = path.as_ref().with_file_name("manifest.toml");
+
+        match Config::builder()
+            .add_source(config::File::from(manifest_path.as_path()))
+            .build()
+        {
+            Ok(config) => {
+                // Before deserializing, check that the schema_version matches
+                // CURRENT_SCHEMA_VERSION value
+                let schema = config.get("schema_version").map_err(|_| {
+                    ManagerError::SchemaNotFound(PathBuf::from(&manifest_path))
+                })?;
+
+                if schema != CURRENT_SCHEMA_VERSION {
+                    Err(ManagerError::SchemaMismatch {
+                        path: PathBuf::from(&manifest_path),
+                        manifest_schema: schema,
+                        current_schema: CURRENT_SCHEMA_VERSION,
+                    })
+                } else {
+                    config.try_deserialize::<ProjectManifest>().map_err(|e| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            format!("Failed to deserialize manifest file: {e}"),
+                        )
+                        .into()
+                    })
+                }
+            }
+            Err(e) => Err(io::Error::new(
+                io::ErrorKind::NotFound,
                 format!(
-                    "Can't initialize manifest.toml at {:?}: {e}",
-                    &manifest_path
+                    "manifest.toml not found in the project directory: {e}"
                 ),
             )
-        })
+            .into()),
+        }
     }
 }
 
 /// State of the program at the start of the run
-#[derive(Deserialize, Serialize, Debug)]
-struct SimulationMeta {
-    // Index of the last checkpoint
-    last_checkpoint: Option<usize>,
-    // Start time of the simulation
-    start_time: DateTime<Utc>,
-    // End time of the simulation
-    end_time: Option<DateTime<Utc>>,
-    // Duration of the program
-    duration: Option<TimeDelta>,
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
+pub(super) struct ProjectMeta {
+    // Project name
+    pub(super) name: String,
+    // Project author
+    pub(super) author: Option<String>,
+    // Project description
+    pub(super) description: Option<String>,
+    // Initialization time of the simulation project
+    pub(super) start_time: DateTime<Utc>,
     // Hash of the git commit
     git_hash: Option<String>,
 }
 
+impl Default for ProjectMeta {
+    fn default() -> Self {
+        Self {
+            name: "new_project".to_string(),
+            author: None,
+            description: None,
+            start_time: Utc::now(),
+            git_hash: None,
+        }
+    }
+}
+
 /// State of the program at the start of the run
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
 struct EnvironmentMeta {
     // OS info
     os: String,
@@ -125,4 +154,21 @@ struct EnvironmentMeta {
     cpu: String,
     // Number of threads
     threads: usize,
+}
+
+impl Default for EnvironmentMeta {
+    fn default() -> Self {
+        let mut sys = System::new_all();
+
+        sys.refresh_all();
+        Self {
+            os: System::name().unwrap_or_else(|| "Unknown OS".to_string()),
+            cpu: sys
+                .cpus()
+                .first()
+                .map(|c| c.brand().to_string())
+                .unwrap_or_else(|| "Unknown CPU".to_string()),
+            threads: current_num_threads(),
+        }
+    }
 }
