@@ -11,6 +11,8 @@ use thiserror::Error;
 pub enum ManagerError {
     #[error("Error in the IO operation: {0}")]
     Io(#[from] std::io::Error),
+    #[error("Formatting error: {0}")]
+    Fmt(#[from] std::fmt::Error),
     #[error("Serialization failed: {0}")]
     Serialization(#[from] toml::ser::Error),
     #[error(
@@ -43,6 +45,10 @@ pub enum ManagerError {
     InvalidStateTransition { from: String, to: String },
     #[error("Invalid simulation status: {0}")]
     InvalidRunStatus(String),
+    #[error("Simulation error: {0}")]
+    SimulationError(String),
+    #[error("{0}")]
+    MultipleErrors(String),
 }
 
 /// Errors that occur during initialization of model parameters
