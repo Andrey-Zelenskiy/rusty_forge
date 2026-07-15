@@ -243,7 +243,7 @@ pub fn derive_builder_from_targets(input: TokenStream) -> TokenStream {
     });
 
     let expanded = quote! {
-        #[derive(BuilderSetters, Default, serde::Serialize, serde::Deserialize)]
+        #[derive(BuilderSetters, Default, serde::Serialize, serde::Deserialize, Clone)]
         pub struct #builder_name {
             #(
                 #builder_fields,

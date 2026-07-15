@@ -294,7 +294,7 @@ use serde::{Deserialize, Serialize};
 
 /// Trait for argument structure with required initialization function
 pub trait BuilderMethods:
-    Default + for<'de> Deserialize<'de> + Serialize
+    Default + for<'de> Deserialize<'de> + Serialize + Sync + Clone
 {
     type Target;
 
@@ -420,7 +420,7 @@ where
 // Blanket implementation for Vec<T>
 impl<T> BuilderMethods for Vec<T>
 where
-    T: Clone + Serialize + for<'de> Deserialize<'de> + Default,
+    T: Clone + Serialize + for<'de> Deserialize<'de> + Default + Sync,
 {
     type Target = Vec<T>;
 
@@ -435,7 +435,7 @@ where
 
 impl<T> TargetFromBuilder for Vec<T>
 where
-    T: Clone + Serialize + for<'de> Deserialize<'de> + Default,
+    T: Clone + Serialize + for<'de> Deserialize<'de> + Default + Sync,
 {
     type Builder = Vec<T>;
 }
@@ -450,7 +450,7 @@ macro_rules! impl_builder_for_sized_arrays {
         $(
             impl<T> BuilderMethods for [T; $N]
             where
-                T: Clone + Serialize + for<'de> Deserialize<'de> + Default + Copy,
+                T: Clone + Serialize + for<'de> Deserialize<'de> + Default + Copy + Sync,
             {
                 type Target = [T; $N];
 
@@ -465,7 +465,7 @@ macro_rules! impl_builder_for_sized_arrays {
 
             impl<T> TargetFromBuilder for [T; $N]
             where
-                T: Clone + Serialize + for<'de> Deserialize<'de> + Default + Copy,
+                T: Clone + Serialize + for<'de> Deserialize<'de> + Default + Copy + Sync,
             {
                 type Builder = [T; $N];
             }
@@ -490,7 +490,7 @@ mod tests {
         y2: u32,
     }
 
-    #[derive(BuilderSetters, Deserialize, Default, Serialize)]
+    #[derive(BuilderSetters, Deserialize, Default, Serialize, Clone)]
     pub struct BuilderExplicit {
         x: u32,
         y: u32,
@@ -524,7 +524,7 @@ mod tests {
         diff: i32,
     }
 
-    #[derive(BuilderSetters, Default, Deserialize, Serialize)]
+    #[derive(BuilderSetters, Default, Deserialize, Serialize, Clone)]
     pub struct BuilderOption {
         x: Option<i32>,
         y: Option<i32>,
