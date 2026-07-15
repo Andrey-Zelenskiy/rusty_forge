@@ -6,8 +6,9 @@ use forge_manager::prelude::*;
 use forge_builder::prelude::*;
 
 fn main() {
-    match <ProjectManager as TargetFromBuilder>::Builder::from_cli(&Cli::parse())
-    {
+    match <ProjectManager as TargetFromBuilder>::Builder::from_cli(
+        &ProjectCli::parse(),
+    ) {
         Err(e) => {
             eprintln!("\n Config file parsing failed: {e}\n");
             std::process::exit(1);
@@ -62,7 +63,7 @@ mod tests {
         let dir =
             tempdir().expect("Failed to initialize a temporary directory");
 
-        let cli = Cli::new(
+        let cli = ProjectCli::new(
             Some(make_config_file(
                 dir.path(),
                 r#"
@@ -105,7 +106,7 @@ mod tests {
         let dir =
             tempdir().expect("Failed to initialize a temporary directory");
 
-        let cli = Cli::new(
+        let cli = ProjectCli::new(
             Some(make_config_file(
                 dir.path(),
                 r#"
@@ -125,7 +126,7 @@ mod tests {
 
     #[test]
     fn test_default_for_empty() {
-        let cli = Cli::default();
+        let cli = ProjectCli::default();
 
         let initializer =
             <ProjectManager as TargetFromBuilder>::Builder::from_cli(&cli)
@@ -144,7 +145,7 @@ mod tests {
 
         let path = dir.path().join("test_project");
 
-        let cli = Cli::new(
+        let cli = ProjectCli::new(
             Some(make_config_file(
                 dir.path(),
                 r#"

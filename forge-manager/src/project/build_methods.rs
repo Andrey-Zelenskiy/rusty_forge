@@ -9,16 +9,17 @@ use serde::{Deserialize, Serialize};
 
 use forge_builder::prelude::*;
 
-use crate::{ManagerError, ManagerResult, ProjectManager};
+use super::ProjectManager;
+use crate::{ManagerError, ManagerResult};
 
-/// Command line interface for loading data
+/// Command line interface for loading project data
 #[derive(Debug, Default, Parser)]
 #[command(
     name = "forge_project",
     about = "Initializes a new simulation project",
     long_about = None
 )]
-pub struct Cli {
+pub struct ProjectCli {
     /// Path to config.toml
     config_file: Option<PathBuf>,
     // Options that override the config
@@ -32,7 +33,7 @@ pub struct Cli {
     description: Option<String>,
 }
 
-impl Cli {
+impl ProjectCli {
     /// Initializes a new structure
     pub fn new(
         config_file: Option<PathBuf>,
@@ -88,17 +89,18 @@ impl Cli {
 }
 
 /// Required data to initialize ProjectManager
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ProjectBuilder {
     pub name: String,
     pub path: PathBuf,
     pub author: Option<String>,
     pub description: Option<String>,
+    pub dirs: Option<Vec<String>>,
 }
 
 impl ProjectBuilder {
     /// New initializer
-    pub fn from_cli(cli: &Cli) -> ManagerResult<Self> {
+    pub fn from_cli(cli: &ProjectCli) -> ManagerResult<Self> {
         // Load information from the config
         let mut initializer = cli.load_config()?;
 
@@ -130,6 +132,7 @@ impl Default for ProjectBuilder {
             path: PathBuf::from("./"),
             author: None,
             description: None,
+            dirs: None,
         }
     }
 }
@@ -143,6 +146,7 @@ impl BuilderMethods for ProjectBuilder {
             &self.author,
             &self.description,
             &self.path,
+            self.dirs.clone(),
         ) {
             Ok(manager) => Ok(manager),
             Err(ManagerError::ProjectAlreadyExists(path)) => {
@@ -164,6 +168,7 @@ impl BuilderMethods for ProjectBuilder {
             path: target.path().to_path_buf(),
             author: target.author().clone(),
             description: target.description().clone(),
+            dirs: target.other_dirs().clone(),
         }
     }
 }
