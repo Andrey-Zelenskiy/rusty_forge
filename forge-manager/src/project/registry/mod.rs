@@ -5,10 +5,13 @@ use std::fs;
 pub mod query;
 
 use chrono::Utc;
+use serde::{Deserialize, Serialize};
 
 use crate::{
-    project::layout::ProjectLayout,
-    registry::query::RunFilter,
+    project::{
+        layout::ProjectLayout,
+        registry::query::RunFilter
+    },
     run::{
         parameters::ParameterMap, Run, RunId, RunIdBuilder, RunState, RunStatus,
     },
@@ -16,7 +19,7 @@ use crate::{
 };
 
 /// Structure that records simulation runs
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Registry;
 
 impl Registry {
@@ -152,7 +155,7 @@ mod tests {
     fn test_register_and_get() {
         let temp = tempdir()
             .expect("Failed to initialize a temporary directory");
-        let layout = ProjectLayout::new(temp.path().to_path_buf());
+        let layout = ProjectLayout::new(temp.path().to_path_buf(), None);
         layout.create_layout().expect("Failed to initialize project");
 
         let registry = Registry;
@@ -172,7 +175,7 @@ mod tests {
     fn test_status_transitions() {
         let temp = tempdir()
             .expect("Failed to initialize a temporary directory");
-        let layout = ProjectLayout::new(temp.path().to_path_buf());
+        let layout = ProjectLayout::new(temp.path().to_path_buf(), None);
         layout.create_layout().expect("Failed to initialize project");
         
         let registry = Registry;
@@ -203,7 +206,7 @@ mod tests {
     fn test_invalid_transition() {
         let temp = tempdir()
             .expect("Failed to initialize a temporary directory");
-        let layout = ProjectLayout::new(temp.path().to_path_buf());
+        let layout = ProjectLayout::new(temp.path().to_path_buf(), None);
         layout.create_layout().expect("Failed to initialize project");
         
         let registry = Registry;
@@ -222,7 +225,7 @@ mod tests {
     fn test_list_runs() {
         let temp = tempdir()
             .expect("Failed to initialize a temporary directory");
-        let layout = ProjectLayout::new(temp.path().to_path_buf());
+        let layout = ProjectLayout::new(temp.path().to_path_buf(), None);
         layout.create_layout().expect("Failed to initialize project");
         
         let registry = Registry;
