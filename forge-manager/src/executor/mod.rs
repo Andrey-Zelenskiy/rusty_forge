@@ -36,30 +36,27 @@ pub enum ExecutionMethod {
 
 impl ExecutionMethod {
     /// Run multiple simulations according to the specified option
-    pub fn run<F1, F2, I>(
+    pub fn run<F1, F2>(
         &self,
+        n_runs: u32,
         single_run: F1,
         slurm_submit: F2,
-        iterator: I,
     ) -> ManagerResult<()>
     where
         F1: Fn(u32) -> ManagerResult<()> + Send + Sync,
         F2: Fn(u32, &SlurmConfig) -> ManagerResult<()> + Send + Sync,
-        I: IntoIterator<Item = u32> + IntoParallelIterator<Item = u32>,
     {
         let err_vec: Vec<String> = match self {
-            Self::LocalSequential => iterator
-                .into_iter()
+            Self::LocalSequential => (0..n_runs)
                 .filter_map(|index| single_run(index).err())
                 .map(|error| error.to_string())
                 .collect(),
-            Self::LocalParallel => iterator
+            Self::LocalParallel => (0..n_runs)
                 .into_par_iter()
                 .filter_map(|index| single_run(index).err())
                 .map(|error| error.to_string())
                 .collect(),
-            Self::Slurm(slurm_config) => iterator
-                .into_iter()
+            Self::Slurm(slurm_config) => (0..n_runs)
                 .filter_map(|index| slurm_submit(index, slurm_config).err())
                 .map(|error| error.to_string())
                 .collect(),
@@ -257,7 +254,7 @@ where
             )
         };
 
-        method.run(single_run, slurm_submit, 0..*n_runs)
+        method.run(*n_runs, single_run, slurm_submit)
     }
 
     /// Executor for Self::Ensemble variant
@@ -272,7 +269,7 @@ where
         // Define runner functions
         let single_run = |_: u32| {
             // Initialize the simulation
-            let simulation = self.clone().builder.build()?;
+            let mut simulation = self.clone().builder.build()?;
 
             // Create a ParameterMap
             let parameters = simulation
@@ -288,7 +285,7 @@ where
             // Save a copy of the config at the initialized directory
             self.write(&project_manager.get_run_dir(&run_id))?;
 
-            Self::single_run(&project_manager, &run_id, &mut simulation.clone())
+            Self::single_run(&project_manager, &run_id, &mut simulation)
         };
 
         let slurm_submit = |_: u32, slurm: &SlurmConfig| {
@@ -308,7 +305,7 @@ where
             )
         };
 
-        method.run(single_run, slurm_submit, 0..*n_runs)
+        method.run(*n_runs, single_run, slurm_submit)
     }
 
     /// Executor for Self::Sweep variant
@@ -320,7 +317,64 @@ where
         // Build the project directory
         let project_manager = self.project.clone().build()?;
 
-        todo!()
+        // Define runner functions
+        let single_run = |index: u32| {
+            // Initialize the simulation
+            let mut simulation = self.clone().builder.build()?;
+
+            // Create a ParameterMap
+            let mut parameters = simulation
+                .get_parameter_map()
+                .map_err(B::Target::into_err)?;
+
+            // Update parameters
+            let sweep_ref = &sweep_config;
+            sweep_ref.validate_parameters(&parameters)?;
+            parameters = sweep_ref.sweep_parameters(index, &parameters)?;
+
+            simulation
+                .upadate_parameters(&parameters)
+                .map_err(B::Target::into_err)?;
+
+            // Create simulation run directory and register the run
+            let run_id = project_manager.register_run(
+                RunIdBuilder::IndexSet(&sweep_ref.indices(index)),
+                &parameters,
+            )?;
+
+            // Save a copy of the config at the initialized directory
+            self.write(&project_manager.get_run_dir(&run_id))?;
+
+            Self::single_run(&project_manager, &run_id, &mut simulation)
+        };
+
+        let slurm_submit = |index: u32, slurm: &SlurmConfig| {
+            // Initialize the simulation
+            let mut simulation = self.clone().builder.build()?;
+
+            // Create a ParameterMap
+            let mut parameters = simulation
+                .get_parameter_map()
+                .map_err(B::Target::into_err)?;
+
+            // Update parameters
+            let sweep_ref = &sweep_config;
+            sweep_ref.validate_parameters(&parameters)?;
+            parameters = sweep_ref.sweep_parameters(index, &parameters)?;
+
+            simulation
+                .upadate_parameters(&parameters)
+                .map_err(B::Target::into_err)?;
+
+            self.slurm_submit(
+                &project_manager,
+                RunIdBuilder::IndexSet(&sweep_ref.indices(index)),
+                &parameters,
+                slurm,
+            )
+        };
+
+        method.run(sweep_config.n_runs(), single_run, slurm_submit)
     }
 
     /// Perform a single simulation run

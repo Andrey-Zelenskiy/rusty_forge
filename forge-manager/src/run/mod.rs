@@ -124,14 +124,6 @@ impl RunId {
         }
     }
 
-    /// Generate new RunId with a single numerical index
-    pub fn from_index(index: u32) -> Self {
-        Self {
-            timestamp: Utc::now(),
-            suffix: Some(Suffix::Index(index)),
-        }
-    }
-
     /// Generate new RunId with a set of numerical indices
     pub fn from_index_set(indices: &[u32]) -> Self {
         Self {
@@ -148,7 +140,6 @@ impl fmt::Display for RunId {
             Some(s) => match s {
                 Suffix::Random(r) => write!(f, "{}_{:08x}", ts, r),
                 Suffix::Hash(h) => write!(f, "{}_param_{}", ts, h),
-                Suffix::Index(i) => write!(f, "{}_{}", ts, i),
                 Suffix::IndexSet(i_set) => {
                     write!(
                         f,
@@ -180,8 +171,6 @@ pub enum Suffix {
     #[serde(rename = "hash")]
     Hash(String),
     #[serde(rename = "index")]
-    Index(u32),
-    #[serde(rename = "index_set")]
     IndexSet(Vec<u32>),
 }
 
@@ -269,8 +258,6 @@ pub enum RunIdBuilder<'a> {
     Timestamp,
     /// Parameters hash
     Parameters(u64),
-    /// Numerical index
-    Index(u32),
     /// Set of numerical indices
     IndexSet(&'a [u32]),
 }
@@ -284,7 +271,6 @@ impl<'a> RunIdBuilder<'a> {
             Self::Parameters(params_hash) => {
                 RunId::from_parameters(params_hash)
             }
-            Self::Index(index) => RunId::from_index(*index),
             Self::IndexSet(indices) => RunId::from_index_set(indices),
         }
     }

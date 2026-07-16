@@ -186,8 +186,6 @@ impl Default for SweepRange {
 #[derive(Default, Serialize, Deserialize, Clone)]
 pub struct SweepConfig {
     sweep_parameters: HashMap<String, SweepRange>,
-    #[serde(skip)]
-    indices: Vec<u32>,
 }
 
 impl SweepConfig {
@@ -212,14 +210,10 @@ impl SweepConfig {
     }
 
     /// Returns parameter map correponding to the current set of sweep indices
-    pub fn sweep_parameters(&self, reference_parameters: &ParameterMap) -> ManagerResult<ParameterMap> {
-        if self.indices.is_empty() {
-            return Err(ManagerError::SweepErrorNotInitialized);
-        }
-        
+    pub fn sweep_parameters(&self, index:u32, reference_parameters: &ParameterMap) -> ManagerResult<ParameterMap> {       
         let mut parameters = reference_parameters.clone();
 
-        for ((key, range),index) in self.sweep_parameters.iter().zip(self.indices.iter()) {
+        for ((key, range),index) in self.sweep_parameters.iter().zip(self.indices(index).iter()) {
             let value = range.value(*index)?;
             
             parameters.insert(key.to_string(), value).ok_or(ManagerError::SweepErrorMissingKey { key: key.to_string() })?;
@@ -228,61 +222,32 @@ impl SweepConfig {
         Ok(parameters)
     }
     
-    /// Hashed index
+    /// De-hash the index
     /// If the range indices are given by index[n], and the number of values
     /// is len[n], then the hash is computed as
     /// index_hash = index[0] + index[1] * len[0] + index[2] * len[0] * len[1]
     /// and so on
-    fn hash(&self, indices: &[u32]) -> u32 {
-        #[cfg(debug_assertions)]
-        assert_eq!(
-            self.size(),
-            indices.len(),
-            "Number of sweep indices is not the same as the number of sweep \
-            parameters: {0} != {1}",
-            self.size(),
-            indices.len(),
-        );
-
+    pub fn indices(&self, index:u32) -> Vec<u32> {
         if self.size() == 1 {
-            return indices[0];
-        }
-
-        let lens = self.n_values_vec();
-        let index_sum: u32 = indices[1..]
-            .iter()
-            .enumerate()
-            .map(|(k, index)| index * lens[..k + 1].iter().product::<u32>())
-            .sum();
-
-        indices[0] + index_sum
-    }
-
-    /// Increment sweep indices
-    fn increment_indices(&self, indices: &[u32]) -> Vec<u32> {
-        // Compute current and new hashed indices
-        let current_index = self.hash(indices);
-        let new_index = current_index + 1;
-
-        if indices.len() == 1 {
-            return vec![new_index];
+            return vec![index];
         }
 
         // De-hash the index
         let lens = self.n_values_vec();
-        let mut new_indices = vec![0; self.size()];
+        let mut indices = vec![0; self.size()];
         let mut residual = 0;
 
         for i in 0..self.size() - 1 {
             let divisor = lens[..self.size() - 1 - i].iter().product::<u32>();
-            new_indices[i] = (new_index - residual) / divisor;
-            residual += new_indices[i] * divisor
+            indices[i] = (index - residual) / divisor;
+            residual += indices[i] * divisor
         }
 
-        new_indices.reverse();
-        new_indices[0] = new_index - residual;
+        indices.reverse();
+        indices[0] = index - residual;
 
-        new_indices
+        indices
+        
     }
 
     /// Returns number of values for each sweep range defined
@@ -296,58 +261,5 @@ impl SweepConfig {
     /// Returns the number of defined ranges
     fn size(&self) -> usize {
         self.sweep_parameters.len()
-    }
-}
-
-impl Iterator for SweepConfig {
-    type Item = u32;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.indices.is_empty() {
-            self.indices = vec![0; self.size()];
-            Some(0)
-        }
-        else {
-            let new_indices = self.increment_indices(&self.indices);
-            let index = self.hash(&new_indices);
-            self.indices = new_indices;
-            Some(index)
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_iter_single_sweep() {
-        let mut sweep_parameters = HashMap::new();
-        sweep_parameters.insert("x".to_string(), SweepRange::default());
-
-        let mut sweep_config = SweepConfig {
-            sweep_parameters,
-            indices: Vec::new(),
-        };
-
-        for i in 0..10 {
-            assert_eq!(Some(i), sweep_config.next());
-        }
-    }
-
-    #[test]
-    fn test_iter_double_sweep() {
-        let mut sweep_parameters = HashMap::new();
-        sweep_parameters.insert("x".to_string(), SweepRange::default());
-        sweep_parameters.insert("y".to_string(), SweepRange::default());
-
-        let mut sweep_config = SweepConfig {
-            sweep_parameters,
-            indices: Vec::new(),
-        };
-
-        for i in 0..100 {
-            assert_eq!(Some(i), sweep_config.next());
-        }
     }
 }
