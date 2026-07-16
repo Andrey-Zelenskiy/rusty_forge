@@ -12,6 +12,7 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    executor::sweep::SweepConfig,
     project::{build_methods::ProjectBuilder, ProjectManager},
     run::{parameters::ParameterMap, RunId, RunIdBuilder},
     ManagerError, ManagerResult, Simulation,
@@ -19,6 +20,8 @@ use crate::{
 
 mod slurm;
 use slurm::SlurmConfig;
+
+mod sweep;
 
 /// Strategy for executing multiple simulations
 #[derive(Serialize, Deserialize, Clone)]
@@ -93,7 +96,10 @@ pub enum ExecutionMode {
         method: ExecutionMethod,
     },
     /// Sweep over parameters
-    Sweep { method: ExecutionMethod },
+    Sweep {
+        sweep_config: SweepConfig,
+        method: ExecutionMethod,
+    },
 }
 
 /// Generic configuration for numerical simulations
@@ -151,7 +157,10 @@ where
             ExecutionMode::Ensemble { n_runs, method } => {
                 self.execute_ensemble(n_runs, method)
             }
-            ExecutionMode::Sweep { method } => self.execute_sweep(method),
+            ExecutionMode::Sweep {
+                sweep_config,
+                method,
+            } => self.execute_sweep(sweep_config, method),
         }
     }
 
@@ -303,7 +312,11 @@ where
     }
 
     /// Executor for Self::Sweep variant
-    fn execute_sweep(&self, method: &ExecutionMethod) -> ManagerResult<()> {
+    fn execute_sweep(
+        &self,
+        sweep_config: &SweepConfig,
+        method: &ExecutionMethod,
+    ) -> ManagerResult<()> {
         // Build the project directory
         let project_manager = self.project.clone().build()?;
 

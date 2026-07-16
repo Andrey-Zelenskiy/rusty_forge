@@ -49,6 +49,25 @@ pub enum ManagerError {
     SimulationError(String),
     #[error("{0}")]
     MultipleErrors(String),
+    #[error(
+        "Error in sweep initialization: min ({min}) must be smaller than \
+        max ({max})"
+    )]
+    SweepErrorInvalidLimits { min: String, max: String },
+    #[error("Error in sweep initialization: n_values can't be zero")]
+    SweepErrorNoValues,
+    #[error(
+        "Error in sweep initialization: sweep type {sweep} doesn't match \
+        value type {value}"
+    )]
+    SweepErrorInvalidType { sweep: String, value: String },
+    #[error(
+        "Error in sweep initialization: sweep key {key} not found in the \
+        parameter map"
+    )]
+    SweepErrorMissingKey { key: String },
+    #[error("Error in sweep initialization: iterator is not initialized")]
+    SweepErrorNotInitialized,
 }
 
 /// Errors that occur during initialization of model parameters
